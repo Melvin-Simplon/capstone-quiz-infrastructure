@@ -36,9 +36,6 @@ jobs:
       - name: Check formatting
         run: terraform fmt -check -recursive
 
-      # -backend=false: validation needs no state, and this job deliberately
-      # holds no Azure identity, so a broken configuration is still caught when
-      # the OIDC trust is down.
       - name: Validate
         run: |
           terraform init -backend=false -input=false
@@ -59,13 +56,9 @@ jobs:
         with:
           terraform_version: 1.9.8
 
-      # Jobs run on separate runners and share no filesystem, so the init done
-      # in lint is gone. Ordering through needs carries no state.
       - name: Init
         run: terraform init -input=false
 
-      # shell: bash brings pipefail. Without it the pipeline returns the status
-      # of tee, which always succeeds, and a failing plan would leave the job green.
       - name: Plan
         shell: bash
         run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
@@ -105,7 +98,5 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
-      # Planning again rather than reusing the pull request artifact: main may have
-      # moved since, and a plan file is only valid against the state it was built on.
       - name: Apply
         run: terraform apply -input=false -auto-approve -lock-timeout=120s

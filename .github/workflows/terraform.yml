@@ -6,10 +6,9 @@ on:
   push:
     branches: [main]
 
+# Elevated only in the jobs that need it, rather than granted to the whole file.
 permissions:
   contents: read
-  id-token: write
-  pull-requests: write
 
 # The remote state is a single shared lock. Serialising the workflow avoids a run
 # failing on a lock held by another one instead of on a real problem.
@@ -25,8 +24,7 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
-  plan:
-    if: github.event_name == 'pull_request'
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -35,14 +33,42 @@ jobs:
         with:
           terraform_version: 1.9.8
 
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      # -backend=false: validation needs no state, and this job deliberately
+      # holds no Azure identity, so a broken configuration is still caught when
+      # the OIDC trust is down.
+      - name: Validate
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  plan:
+    needs: lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.9.8
+
+      # Jobs run on separate runners and share no filesystem, so the init done
+      # in lint is gone. Ordering through needs carries no state.
       - name: Init
         run: terraform init -input=false
 
+      # shell: bash brings pipefail. Without it the pipeline returns the status
+      # of tee, which always succeeds, and a failing plan would leave the job green.
       - name: Plan
-        id: plan
-        run: |
-          terraform plan -input=false -no-color -lock-timeout=120s -out=tfplan | tee plan.txt
-          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
 
       - name: Comment plan on the pull request
         uses: actions/github-script@v7
@@ -62,9 +88,13 @@ jobs:
             });
 
   apply:
+    needs: lint
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: nonprod
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 

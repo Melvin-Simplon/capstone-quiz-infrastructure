@@ -28,17 +28,6 @@ variable "environment" {
   default     = "nonprod"
 }
 
-variable "shared_resource_group_name" {
-  description = "Shared resource group holding the App Service Plan"
-  type        = string
-  default     = "rg-shared-prf2026"
-}
-
-variable "shared_service_plan_name" {
-  description = "Shared App Service Plan, referenced and not created"
-  type        = string
-  default     = "plan-npr-prf2026"
-}
 
 variable "vnet_address_space" {
   description = "Address space of the project virtual network"

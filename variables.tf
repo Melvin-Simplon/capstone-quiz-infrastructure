@@ -10,12 +10,6 @@ variable "resource_group_name" {
   default     = "mpetitRG"
 }
 
-variable "location" {
-  description = "Azure region"
-  type        = string
-  default     = "francecentral"
-}
-
 variable "owner" {
   description = "Owner identifier, set as the owner tag on every resource"
   type        = string

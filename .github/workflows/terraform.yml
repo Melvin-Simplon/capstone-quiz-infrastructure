@@ -6,12 +6,9 @@ on:
   push:
     branches: [main]
 
-# Elevated only in the jobs that need it, rather than granted to the whole file.
 permissions:
   contents: read
 
-# The remote state is a single shared lock. Serialising the workflow avoids a run
-# failing on a lock held by another one instead of on a real problem.
 concurrency:
   group: terraform-${{ github.ref }}
   cancel-in-progress: false
@@ -41,8 +38,45 @@ jobs:
           terraform init -backend=false -input=false
           terraform validate
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Secret scanning needs the history: a credential removed in a later
+          # commit still sits in the one that introduced it.
+          fetch-depth: 0
+
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: latest
+
+      # Catches what validate cannot: invalid azurerm argument values, resources
+      # that will only be rejected once Azure answers, and deprecated syntax.
+      - name: Lint the provider usage
+        run: |
+          tflint --init
+          tflint --format compact --recursive
+
+      - name: Scan the configuration
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Scan for secrets
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "1"
+
   plan:
-    needs: lint
+    needs: [lint, security]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -81,7 +115,7 @@ jobs:
             });
 
   apply:
-    needs: lint
+    needs: [lint, security]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: nonprod

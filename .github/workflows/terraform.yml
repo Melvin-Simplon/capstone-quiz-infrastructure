@@ -43,16 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Secret scanning needs the history: a credential removed in a later
-          # commit still sits in the one that introduced it.
           fetch-depth: 0
 
       - uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: v0.64.0
-
-      # Catches what validate cannot: invalid azurerm argument values, resources
-      # that will only be rejected once Azure answers, and deprecated syntax.
       - name: Lint the provider usage
         run: |
           tflint --init
@@ -103,9 +98,9 @@ jobs:
           script: |
             const fs = require('fs');
             const plan = fs.readFileSync('plan.txt', 'utf8');
-            // GitHub rejects comments over 65536 characters.
-            const body = plan.length > 60000
-              ? plan.slice(0, 60000) + '\n\n... truncated, see the job log for the full plan.'
+            const maxCommentLength = 60000;
+            const body = plan.length > maxCommentLength
+              ? plan.slice(0, maxCommentLength) + '\n\n... truncated, see the job log for the full plan.'
               : plan;
             await github.rest.issues.createComment({
               issue_number: context.issue.number,

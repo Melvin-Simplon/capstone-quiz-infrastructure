@@ -8,11 +8,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  pull-requests: write
 
-# The remote state is a single shared lock. Serialising the workflow avoids a run
-# failing on a lock held by another one instead of on a real problem.
 concurrency:
   group: terraform-${{ github.ref }}
   cancel-in-progress: false
@@ -25,9 +21,68 @@ env:
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.9.8
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Validate
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Secret scanning needs the history: a credential removed in a later
+          # commit still sits in the one that introduced it.
+          fetch-depth: 0
+
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: latest
+
+      # Catches what validate cannot: invalid azurerm argument values, resources
+      # that will only be rejected once Azure answers, and deprecated syntax.
+      - name: Lint the provider usage
+        run: |
+          tflint --init
+          tflint --format compact --recursive
+
+      - name: Scan the configuration
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Scan for secrets
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "1"
+
   plan:
+    needs: [lint, security]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
 
@@ -39,10 +94,8 @@ jobs:
         run: terraform init -input=false
 
       - name: Plan
-        id: plan
-        run: |
-          terraform plan -input=false -no-color -lock-timeout=120s -out=tfplan | tee plan.txt
-          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
 
       - name: Comment plan on the pull request
         uses: actions/github-script@v7
@@ -62,9 +115,13 @@ jobs:
             });
 
   apply:
+    needs: [lint, security]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: nonprod
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -75,7 +132,5 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
-      # Planning again rather than reusing the pull request artifact: main may have
-      # moved since, and a plan file is only valid against the state it was built on.
       - name: Apply
         run: terraform apply -input=false -auto-approve -lock-timeout=120s

@@ -31,14 +31,30 @@ az ad sp show --id "$APP_ID" >/dev/null 2>&1 || az ad sp create --id "$APP_ID" >
 SP_ID=$(az ad sp show --id "$APP_ID" --query id -o tsv)
 
 echo "==> Federated credentials"
+# GitHub now issues immutable subjects, carrying the numeric ids of the account
+# and of the repository rather than their names. Asking the API for the prefix
+# it actually signs avoids guessing which form is in use, and keeps working if
+# that form changes again.
+SUB_PREFIX=$(gh api "repos/${REPO}/actions/oidc/customization/sub" --jq '.sub_claim_prefix' 2>/dev/null || true)
+[ -z "$SUB_PREFIX" ] && SUB_PREFIX="repo:${REPO}"
+echo "    subject prefix: $SUB_PREFIX"
+
 # One subject per trusted context. Anything else, another branch or another
 # repository, gets no token at all.
 add_federated_credential() {
-  local name="$1" subject="$2"
-  az ad app federated-credential list --id "$APP_ID" --query "[?name=='$name']" -o tsv | grep -q . && {
+  local name="$1" subject="$2" current
+  current=$(az ad app federated-credential list --id "$APP_ID" --query "[?name=='$name'].subject | [0]" -o tsv)
+
+  if [ "$current" = "$subject" ]; then
     echo "    $name already there"
     return
-  }
+  fi
+
+  if [ -n "$current" ]; then
+    az ad app federated-credential delete --id "$APP_ID" --federated-credential-id "$name"
+    echo "    $name had a stale subject, recreating"
+  fi
+
   az ad app federated-credential create --id "$APP_ID" --parameters "{
     \"name\": \"$name\",
     \"issuer\": \"https://token.actions.githubusercontent.com\",
@@ -48,9 +64,9 @@ add_federated_credential() {
   echo "    $name created"
 }
 
-add_federated_credential "main-branch" "repo:${REPO}:ref:refs/heads/main"
-add_federated_credential "pull-request" "repo:${REPO}:pull_request"
-add_federated_credential "nonprod-environment" "repo:${REPO}:environment:nonprod"
+add_federated_credential "main-branch" "${SUB_PREFIX}:ref:refs/heads/main"
+add_federated_credential "pull-request" "${SUB_PREFIX}:pull_request"
+add_federated_credential "nonprod-environment" "${SUB_PREFIX}:environment:nonprod"
 
 echo "==> Role assignments"
 assign() {

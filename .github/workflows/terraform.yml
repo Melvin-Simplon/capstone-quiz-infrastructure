@@ -49,7 +49,7 @@ jobs:
 
       - uses: terraform-linters/setup-tflint@v6
         with:
-          tflint_version: latest
+          tflint_version: v0.64.0
 
       # Catches what validate cannot: invalid azurerm argument values, resources
       # that will only be rejected once Azure answers, and deprecated syntax.

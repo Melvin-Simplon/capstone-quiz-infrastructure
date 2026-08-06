@@ -106,3 +106,14 @@ variable "redis_sku_name" {
   type        = string
   default     = "Balanced_B0"
 }
+
+variable "deployer_principal_id" {
+  description = <<-EOT
+    Object id of the identity the pipeline runs as, the app registration created
+    by scripts/bootstrap-oidc.sh. An identifier, not a secret. Pinned here rather
+    than read from the running credentials so that the same plan comes out the
+    same whoever asks for it.
+  EOT
+  type        = string
+  default     = "8d4152a8-f478-43fd-b54d-81fbf1b5a301"
+}

@@ -52,3 +52,74 @@ variable "subnet_privatelink_prefix" {
   type        = string
   default     = "10.60.3.0/24"
 }
+
+variable "shared_resource_group_name" {
+  description = "Resource group holding the resources shared with the promotion"
+  type        = string
+  default     = "rg-shared-prf2026"
+}
+
+variable "app_service_plan_name" {
+  description = "Shared App Service Plan hosting the backend, referenced as a data source"
+  type        = string
+  default     = "plan-npr-prf2026"
+}
+
+variable "static_web_app_location" {
+  description = "Static Web Apps are not offered in France Central, hence a separate location"
+  type        = string
+  default     = "westeurope"
+}
+
+variable "postgres_version" {
+  description = "PostgreSQL major version"
+  type        = string
+  default     = "16"
+}
+
+variable "postgres_sku_name" {
+  description = "Burstable tier, the only one within this subscription's quota"
+  type        = string
+  default     = "B_Standard_B1ms"
+}
+
+variable "postgres_storage_mb" {
+  description = "Storage allocated to the database server"
+  type        = number
+  default     = 32768
+}
+
+variable "postgres_admin_username" {
+  description = "Administrator login of the database server"
+  type        = string
+  default     = "quizzadmin"
+}
+
+variable "postgres_database_name" {
+  description = "Application database, created empty and migrated by Flyway at startup"
+  type        = string
+  default     = "quizz"
+}
+
+variable "redis_sku_name" {
+  description = "Azure Managed Redis SKU"
+  type        = string
+  default     = "Balanced_B0"
+}
+
+variable "deployer_ip" {
+  description = <<-EOT
+    Public IP allowed through the Key Vault firewall. Secrets are written over the
+    data plane, which the firewall filters, so whoever runs Terraform has to be
+    allowed in: the CI runner resolves its own address before apply, a local run
+    sets TF_VAR_deployer_ip. Empty means no address is allowed and secret writes
+    fail, which is the intended default rather than an open vault.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.deployer_ip == "" || can(cidrhost("${var.deployer_ip}/32", 0))
+    error_message = "deployer_ip must be a single IPv4 address, without a prefix length."
+  }
+}

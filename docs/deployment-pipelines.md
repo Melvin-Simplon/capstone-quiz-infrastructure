@@ -85,6 +85,27 @@ push protection are enabled on top, at the platform level: they refuse a credent
 which is earlier than any pipeline can act, but only for the patterns GitHub recognises. The two
 overlap without replacing each other.
 
+### What it caught, first time out
+
+The backend gate failed on the very first run, before a single deployment had gone out:
+
+```
+pom.xml (pom)
+Total: 1 (HIGH: 1, CRITICAL: 0)
+
+org.postgresql:postgresql  CVE-2026-54291  HIGH  installed 42.7.11  fixed 42.7.12
+```
+
+A HIGH severity flaw in the SCRAM client the PostgreSQL driver authenticates with, on a dependency
+nobody had touched: Spring Boot's parent pins that version, and pinning is exactly what makes it
+invisible. The fix was one property in `pom.xml`, carrying a comment that says when the line can be
+removed again.
+
+Worth stating plainly, since it is the argument for having the gate at all: this was not a warning
+in a report somebody would read later. It stopped a pull request, on a dependency that had been
+sitting there since the project was handed over, before the code it belongs to had ever reached
+Azure.
+
 ## What holds it together
 
 **No stored credentials.** Each repository has its own federated credential on the same app

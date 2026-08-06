@@ -80,6 +80,12 @@ assign() {
 # Scoped to the dedicated resource group, never the subscription.
 assign "Contributor" "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}"
 
+# Terraform hands the backend's managed identity its roles on Key Vault and on
+# the storage container, and grants itself the one that lets it write secrets.
+# Creating a role assignment is not something Contributor may do, hence this.
+assign "Role Based Access Control Administrator" \
+  "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}"
+
 # The state account has shared key access disabled, so reaching the state needs
 # a data plane role. Control plane rights alone would not open the blob.
 assign "Storage Blob Data Contributor" \

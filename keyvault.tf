@@ -27,14 +27,21 @@ resource "azurerm_key_vault" "main" {
     default_action = "Deny"
     # Lets Azure services that authenticate with a managed identity through, which
     # is how App Service resolves the @Microsoft.KeyVault references.
-    bypass   = "AzureServices"
-    ip_rules = compact([var.deployer_ip])
+    bypass = "AzureServices"
+    # Empty, and left alone afterwards: whoever runs Terraform has to read these
+    # secrets over the data plane, and gets a different address on every run. An
+    # address that changes each time is not desired state, so scripts/keyvault-
+    # firewall.sh opens the door for the run and closes it after. Holding the
+    # list here instead deadlocks the refresh: Terraform would have to read the
+    # secrets before it could grant itself the right to read them.
+    ip_rules = []
   }
 
   tags = merge(local.common_tags, { component = "secrets" })
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [network_acls[0].ip_rules]
   }
 }
 

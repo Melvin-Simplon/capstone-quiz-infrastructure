@@ -1,4 +1,4 @@
-# 0004 — PostgreSQL is injected into the network, not fronted by a private endpoint
+# 0004. PostgreSQL is injected into the network, not fronted by a private endpoint
 
 Accepted, 2026-08-05.
 

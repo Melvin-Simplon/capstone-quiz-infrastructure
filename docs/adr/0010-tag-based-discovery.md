@@ -1,4 +1,4 @@
-# 0010 — Pipelines find their targets by tag, never by name
+# 0010. Pipelines find their targets by tag, never by name
 
 Accepted, 2026-08-06.
 

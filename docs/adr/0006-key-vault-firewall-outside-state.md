@@ -1,4 +1,4 @@
-# 0006 — The vault's allowed addresses are not part of the desired state
+# 0006. The vault's allowed addresses are not part of the desired state
 
 Accepted, 2026-08-06.
 

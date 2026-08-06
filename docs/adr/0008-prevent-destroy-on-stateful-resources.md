@@ -1,4 +1,4 @@
-# 0008 — Terraform may not delete what holds data
+# 0008. Terraform may not delete what holds data
 
 Accepted, 2026-08-06.
 

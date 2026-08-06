@@ -1,4 +1,4 @@
-# 0011 — The backend was not put behind the Static Web App, and should be
+# 0011. The backend was not put behind the Static Web App, and should be
 
 Accepted, 2026-08-06. Records a better answer than
 [0003](0003-public-backend-with-api-key.md), deliberately not applied here.

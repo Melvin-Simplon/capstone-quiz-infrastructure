@@ -1,4 +1,4 @@
-# Simplon Quiz — Infrastructure
+# Simplon Quiz Infrastructure
 
 [![terraform](https://github.com/WhiteMuush/simplon-quiz-infrastructure-bilan/actions/workflows/terraform.yml/badge.svg?branch=main)](https://github.com/WhiteMuush/simplon-quiz-infrastructure-bilan/actions/workflows/terraform.yml)
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.9-7B42BC?logo=terraform&logoColor=white)](versions.tf)
@@ -31,7 +31,7 @@ App Service Plan with the backend web app, and a Static Web App for the frontend
 
 Two components answer the internet, and only two: the static site, and the backend. Everything else
 is reached from inside the network, through a private endpoint or by injection. Why the backend is
-among them, and what guards it, is [ADR 0003](docs/adr/0003-public-backend-with-api-key.md) — and
+among them, and what guards it, is [ADR 0003](docs/adr/0003-public-backend-with-api-key.md), and
 what should replace it is [ADR 0011](docs/adr/0011-linked-backend-not-taken.md).
 
 ## Repository layout
@@ -64,7 +64,7 @@ identity holds it; a person is granted it separately, and
 configuration.
 
 Deleting anything holding data is refused on purpose. Tearing this environment down therefore
-begins by removing the `prevent_destroy` blocks, deliberately, in a commit of its own — see
+begins by removing the `prevent_destroy` blocks, deliberately, in a commit of its own, see
 [ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md).
 
 ## Bootstrap
@@ -84,9 +84,9 @@ runs from, and Azure returns a token that expires with the job.
 [docs/adr](docs/adr/README.md) holds one record per decision, including the four that only became
 apparent by applying. Two are worth opening first:
 
-- [ADR 0003](docs/adr/0003-public-backend-with-api-key.md) — the weakest point of the design,
+- [ADR 0003](docs/adr/0003-public-backend-with-api-key.md): the weakest point of the design,
   named rather than hidden
-- [ADR 0005](docs/adr/0005-dedicated-app-service-plan.md) — the platform limit that forced this
+- [ADR 0005](docs/adr/0005-dedicated-app-service-plan.md): the platform limit that forced this
   environment off the promotion's shared App Service plan
 
 ## Branches

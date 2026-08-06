@@ -1,4 +1,4 @@
-# 0001 — GitHub Actions carries the pipelines
+# 0001. GitHub Actions carries the pipelines
 
 Accepted, 2026-07-30.
 

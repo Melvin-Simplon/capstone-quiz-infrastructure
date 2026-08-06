@@ -1,4 +1,4 @@
-# 0009 — The identity allowed to write secrets is named, not inferred
+# 0009. The identity allowed to write secrets is named, not inferred
 
 Accepted, 2026-08-06.
 

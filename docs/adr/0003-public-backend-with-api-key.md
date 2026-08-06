@@ -1,4 +1,4 @@
-# 0003 — The backend answers the internet, guarded by an origin and a key
+# 0003. The backend answers the internet, guarded by an origin and a key
 
 Accepted, 2026-07-30.
 

@@ -1,4 +1,4 @@
-# 0002 — App Service and Static Web Apps, not the shared AKS cluster
+# 0002. App Service and Static Web Apps, not the shared AKS cluster
 
 Accepted, 2026-07-30.
 

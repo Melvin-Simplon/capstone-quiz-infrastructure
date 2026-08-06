@@ -1,4 +1,4 @@
-# 0005 — The backend runs on a plan of its own
+# 0005. The backend runs on a plan of its own
 
 Accepted, 2026-08-06.
 

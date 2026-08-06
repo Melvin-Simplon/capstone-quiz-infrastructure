@@ -1,4 +1,4 @@
-# 0007 — The storage account has no public surface at all
+# 0007. The storage account has no public surface at all
 
 Accepted, 2026-08-06.
 

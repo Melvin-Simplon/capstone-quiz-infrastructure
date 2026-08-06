@@ -88,6 +88,12 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
+      # Key Vault secrets are written over the data plane, which the vault
+      # firewall filters, so the runner has to allow itself in for the run. The
+      # address changes on every run, so this rule is rewritten every time.
+      - name: Resolve the runner public address
+        run: echo "TF_VAR_deployer_ip=$(curl -fsS https://api.ipify.org)" >> "$GITHUB_ENV"
+
       - name: Plan
         shell: bash
         run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
@@ -126,6 +132,9 @@ jobs:
 
       - name: Init
         run: terraform init -input=false
+
+      - name: Resolve the runner public address
+        run: echo "TF_VAR_deployer_ip=$(curl -fsS https://api.ipify.org)" >> "$GITHUB_ENV"
 
       - name: Apply
         run: terraform apply -input=false -auto-approve -lock-timeout=120s

@@ -106,20 +106,3 @@ variable "redis_sku_name" {
   type        = string
   default     = "Balanced_B0"
 }
-
-variable "deployer_ip" {
-  description = <<-EOT
-    Public IP allowed through the Key Vault firewall. Secrets are written over the
-    data plane, which the firewall filters, so whoever runs Terraform has to be
-    allowed in: the CI runner resolves its own address before apply, a local run
-    sets TF_VAR_deployer_ip. Empty means no address is allowed and secret writes
-    fail, which is the intended default rather than an open vault.
-  EOT
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.deployer_ip == "" || can(cidrhost("${var.deployer_ip}/32", 0))
-    error_message = "deployer_ip must be a single IPv4 address, without a prefix length."
-  }
-}

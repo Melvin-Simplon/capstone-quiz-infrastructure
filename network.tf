@@ -37,6 +37,10 @@ resource "azurerm_subnet" "postgres" {
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_postgres_prefix]
 
+  # Added by Azure itself when the server is injected here, so declaring it is
+  # what stops Terraform from trying to take it away on every run.
+  service_endpoints = ["Microsoft.Storage"]
+
   delegation {
     name = "flexibleservers"
 

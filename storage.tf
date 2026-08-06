@@ -19,6 +19,15 @@ resource "azurerm_storage_account" "main" {
   # this switch does not filter.
   public_network_access_enabled = false
 
+  # Redundant with the line above, which already denies everything: an account
+  # closed to the internet has no traffic left for these rules to sort. Kept
+  # because it is what an audit reads, and because it is what still stands if
+  # public access is ever turned back on.
+  network_rules {
+    default_action = "Deny"
+    bypass         = ["AzureServices"]
+  }
+
   blob_properties {
     versioning_enabled = true
 

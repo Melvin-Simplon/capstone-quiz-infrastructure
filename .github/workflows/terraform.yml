@@ -88,15 +88,26 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
-      # Key Vault secrets are written over the data plane, which the vault
-      # firewall filters, so the runner has to allow itself in for the run. The
-      # address changes on every run, so this rule is rewritten every time.
-      - name: Resolve the runner public address
-        run: echo "TF_VAR_deployer_ip=$(curl -fsS https://api.ipify.org)" >> "$GITHUB_ENV"
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Reading the vault's secrets goes through the data plane, which its
+      # firewall filters. The door is opened for this run and closed right after,
+      # rather than left described in the configuration.
+      - name: Open the Key Vault to this runner
+        run: scripts/keyvault-firewall.sh add
 
       - name: Plan
         shell: bash
         run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
+
+      - name: Close the Key Vault again
+        if: always()
+        run: scripts/keyvault-firewall.sh remove
 
       - name: Comment plan on the pull request
         uses: actions/github-script@v7
@@ -133,8 +144,19 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
-      - name: Resolve the runner public address
-        run: echo "TF_VAR_deployer_ip=$(curl -fsS https://api.ipify.org)" >> "$GITHUB_ENV"
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Open the Key Vault to this runner
+        run: scripts/keyvault-firewall.sh add
 
       - name: Apply
         run: terraform apply -input=false -auto-approve -lock-timeout=120s
+
+      - name: Close the Key Vault again
+        if: always()
+        run: scripts/keyvault-firewall.sh remove

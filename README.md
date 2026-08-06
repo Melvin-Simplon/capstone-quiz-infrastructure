@@ -12,17 +12,26 @@ shared and only referenced.
 
 ## Running it
 
-Deployments go through the `terraform` workflow. A local run is for reading a plan, and needs one
-input the pipeline resolves by itself:
+Deployments go through the `terraform` workflow. A local run is for reading a plan, and takes two
+steps because Terraform reads the vault's secrets over the data plane, which its firewall filters:
 
 ```sh
-terraform plan -var "deployer_ip=$(curl -fsS https://api.ipify.org)"
+scripts/keyvault-firewall.sh add
+terraform plan
+scripts/keyvault-firewall.sh remove
 ```
 
-Key Vault secrets are written over the data plane, which the vault firewall filters. Whoever runs
-Terraform therefore has to be let through, and that rule is rewritten on every run since the
-address changes. The storage account needs nothing of the sort: it is closed to the internet
-altogether, its container being created over the Resource Manager API.
+The allowed address is not part of the desired state. A runner gets a new one on every run, and
+describing the list in the configuration deadlocks the refresh: Terraform would have to read the
+secrets before it could grant itself the right to read them. The pipeline runs the same two steps
+around its own.
+
+Reading a plan locally also needs the `Key Vault Secrets Officer` role on the vault. The pipeline's
+identity grants it to itself; a person has to be granted it.
+
+The storage account needs none of this: it is closed to the internet altogether, its container
+being created over the Resource Manager API, and the provider is told so with
+`data_plane_available = false`.
 
 The database server, the storage account and its container, the vault and its secrets carry
 `prevent_destroy`. Terraform refuses to delete them, and refuses any change that would recreate

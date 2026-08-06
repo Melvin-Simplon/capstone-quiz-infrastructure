@@ -107,19 +107,13 @@ variable "redis_sku_name" {
   default     = "Balanced_B0"
 }
 
-variable "deployer_ip" {
+variable "deployer_principal_id" {
   description = <<-EOT
-    Public IP allowed through the Key Vault firewall. Secrets are written over the
-    data plane, which the firewall filters, so whoever runs Terraform has to be
-    allowed in: the CI runner resolves its own address before apply, a local run
-    sets TF_VAR_deployer_ip. Empty means no address is allowed and secret writes
-    fail, which is the intended default rather than an open vault.
+    Object id of the identity the pipeline runs as, the app registration created
+    by scripts/bootstrap-oidc.sh. An identifier, not a secret. Pinned here rather
+    than read from the running credentials so that the same plan comes out the
+    same whoever asks for it.
   EOT
   type        = string
-  default     = ""
-
-  validation {
-    condition     = var.deployer_ip == "" || can(cidrhost("${var.deployer_ip}/32", 0))
-    error_message = "deployer_ip must be a single IPv4 address, without a prefix length."
-  }
+  default     = "8d4152a8-f478-43fd-b54d-81fbf1b5a301"
 }

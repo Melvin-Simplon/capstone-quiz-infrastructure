@@ -27,23 +27,36 @@ resource "azurerm_key_vault" "main" {
     default_action = "Deny"
     # Lets Azure services that authenticate with a managed identity through, which
     # is how App Service resolves the @Microsoft.KeyVault references.
-    bypass   = "AzureServices"
-    ip_rules = compact([var.deployer_ip])
+    bypass = "AzureServices"
+    # Empty, and left alone afterwards: whoever runs Terraform has to read these
+    # secrets over the data plane, and gets a different address on every run. An
+    # address that changes each time is not desired state, so scripts/keyvault-
+    # firewall.sh opens the door for the run and closes it after. Holding the
+    # list here instead deadlocks the refresh: Terraform would have to read the
+    # secrets before it could grant itself the right to read them.
+    ip_rules = []
   }
 
   tags = merge(local.common_tags, { component = "secrets" })
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [network_acls[0].ip_rules]
   }
 }
 
-# Terraform's own identity: Contributor on the resource group is a control plane
+# The pipeline's identity: Contributor on the resource group is a control plane
 # role and grants nothing on secrets, so writing them requires this.
+#
+# Named explicitly rather than read from the current credentials: keyed on
+# whoever happens to be running, this assignment changes hands on every run, and
+# a plan run by a person would propose to take it away from the pipeline. A
+# person who needs to read a plan locally is granted the role separately, which
+# is not something this configuration should be describing.
 resource "azurerm_role_assignment" "deployer_secrets" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.deployer_principal_id
 }
 
 resource "azurerm_role_assignment" "backend_secrets" {

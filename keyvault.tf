@@ -45,12 +45,18 @@ resource "azurerm_key_vault" "main" {
   }
 }
 
-# Terraform's own identity: Contributor on the resource group is a control plane
+# The pipeline's identity: Contributor on the resource group is a control plane
 # role and grants nothing on secrets, so writing them requires this.
+#
+# Named explicitly rather than read from the current credentials: keyed on
+# whoever happens to be running, this assignment changes hands on every run, and
+# a plan run by a person would propose to take it away from the pipeline. A
+# person who needs to read a plan locally is granted the role separately, which
+# is not something this configuration should be describing.
 resource "azurerm_role_assignment" "deployer_secrets" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.deployer_principal_id
 }
 
 resource "azurerm_role_assignment" "backend_secrets" {

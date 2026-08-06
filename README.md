@@ -1,23 +1,44 @@
 # simplon-quiz-infrastructure-bilan
 
-Terraform infrastructure for the non-production environment of the Simplon quiz app on Azure.
+Terraform for the non-production environment of the Simplon quiz application on Azure. Everything
+below is applied by the pipeline in this repository; nothing here is created by hand except the two
+things that cannot be, listed under [Bootstrap](#bootstrap).
 
 ![Architecture](img/simplon-schéma-infrastructure-quiz.drawio.png)
 
-## Stack
+| | |
+| --- | --- |
+| Application | <https://kind-ocean-089457b03.7.azurestaticapps.net> |
+| Backend health | <https://app-simplon-quiz-mpetit.azurewebsites.net/actuator/health> |
+| Resource group | `mpetitRG`, France Central |
 
-App Service (backend), Static Web Apps (frontend), PostgreSQL Flexible Server, Azure Managed
-Redis, Storage Account, Key Vault. All in `mpetitRG`, on an App Service Plan of its own.
+## What is in here
 
-The promotion's shared plan `plan-npr-prf2026` was the intended host, but an App Service plan
-accepts exactly two VNet integrations, one virtual interface each on its workers, and both were
-taken. That limit belongs to the hardware rather than to the pricing tier, so scaling the shared
-plan up would not have made room.
+A virtual network with three subnets, one per thing that needs its own: outbound integration for
+the backend, the delegated subnet PostgreSQL is injected into, and the one holding the private
+endpoints. Each carries a network security group.
+
+On top of that: PostgreSQL Flexible Server, Azure Managed Redis, a storage account, a Key Vault, an
+App Service Plan and the backend web app, and a Static Web App for the frontend.
+
+Only two components answer the internet: the static site, and the backend. Everything else is
+reached from inside the network, either through a private endpoint or by injection. Why the backend
+is among them, and what guards it, is [0003](docs/adr/0003-public-backend-with-api-key.md).
+
+| File | |
+| --- | --- |
+| `network.tf` | virtual network, subnets, security groups |
+| `dns.tf` | the four private DNS zones and their links |
+| `postgres.tf`, `redis.tf`, `storage.tf`, `keyvault.tf` | the data services and their private endpoints |
+| `app-service.tf`, `static-web-app.tf` | the plan, the backend, the site |
+| `docs/adr/` | why each of those looks the way it does |
+| `docs/deployment-pipelines.md` | how the two applications get deployed onto it |
 
 ## Running it
 
-Deployments go through the `terraform` workflow. A local run is for reading a plan, and takes two
-steps because Terraform reads the vault's secrets over the data plane, which its firewall filters:
+Deployments go through the `terraform` workflow: a plan on every pull request, commented back onto
+it, and an apply on merge into `main`. A local run is for reading a plan, and takes two steps
+because Terraform reads the vault's secrets over the data plane, which its firewall filters:
 
 ```sh
 scripts/keyvault-firewall.sh add
@@ -25,31 +46,40 @@ terraform plan
 scripts/keyvault-firewall.sh remove
 ```
 
-The allowed address is not part of the desired state. A runner gets a new one on every run, and
-describing the list in the configuration deadlocks the refresh: Terraform would have to read the
-secrets before it could grant itself the right to read them. The pipeline runs the same two steps
-around its own.
+Reading a plan locally also needs `Key Vault Secrets Officer` on the vault. The pipeline's identity
+has it; a person has to be granted it separately, and
+[0009](docs/adr/0009-named-deployer-identity.md) explains why that is not in the configuration.
 
-Reading a plan locally also needs the `Key Vault Secrets Officer` role on the vault. The pipeline's
-identity grants it to itself; a person has to be granted it.
+Deleting anything that holds data is refused on purpose, so tearing this environment down starts by
+removing the `prevent_destroy` blocks, deliberately, in a commit of its own. See
+[0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md).
 
-The storage account needs none of this: it is closed to the internet altogether, its container
-being created over the Resource Manager API, and the provider is told so with
-`data_plane_available = false`.
+## Bootstrap
 
-The database server, the storage account and its container, the vault and its secrets carry
-`prevent_destroy`. Terraform refuses to delete them, and refuses any change that would recreate
-them. Tearing the environment down therefore starts by removing those blocks, deliberately, in a
-commit of its own.
+Two things cannot be created by the Terraform that consumes them, so
+[`scripts/bootstrap-oidc.sh`](scripts/bootstrap-oidc.sh) creates them once:
 
-## Deployment
+- the storage account holding the remote state, reached with an Azure AD identity rather than a key
+- the app registration GitHub authenticates as, with one federated credential per repository and
+  per context, and the role assignments that go with it
 
-[docs/deployment-pipelines.md](docs/deployment-pipelines.md) covers how the backend and the
-frontend reach this infrastructure, and why neither pipeline stores a credential or names a
-resource.
+No client secret exists anywhere. Each workflow proves which repository, branch and environment it
+runs from, and Azure hands back a token that expires with the job.
+
+## Decisions
+
+[docs/adr](docs/adr/README.md) holds one file per decision worth defending, including the ones that
+cost an apply to discover. Start with
+[0003](docs/adr/0003-public-backend-with-api-key.md) for the weakest point of the design and
+[0005](docs/adr/0005-dedicated-app-service-plan.md) for the constraint that forced this environment
+off the shared App Service plan.
 
 ## Branches
 
-- `main`: deployed to Azure
+- `main`: applied to Azure
 - `develop`: integration
-- `feature/*`: one per change, merged into `develop` via pull request
+- `feat/*`, `fix/*`, `ci/*`, `docs/*`, `chore/*`: one per change, merged into `develop` by pull
+  request
+
+Both protected branches refuse deletion, force-pushes, unsigned commits, direct writes, and any
+merge whose checks have not passed.

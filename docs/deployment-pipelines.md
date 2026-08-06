@@ -11,14 +11,21 @@ resource: every pipeline asks Azure for its target by tag.
 
 ```mermaid
 flowchart TD
-    PR["Pull request into develop or main"] --> V["mvn -B verify<br/>compile, unit tests"]
-    PR --> S["trivy fs, secret scan"]
+    PR["Pull request into develop or main"] --> G
+    M["Merge into main"] --> G
 
-    M["Merge into main"] --> B["mvn -B package -DskipTests<br/>tests already ran on the pull request"]
+    subgraph G["Quality gate, the same on both paths"]
+        V["mvn -B verify<br/>compile, unit tests"]
+        C["trivy fs<br/>CVEs in the Maven dependencies"]
+        S["trivy secret<br/>credentials in the tree"]
+        Q["CodeQL, java-kotlin<br/>vulnerabilities in the code"]
+    end
+
+    G --> B["mvn -B package -DskipTests<br/>the tests just ran, above"]
     B --> J["target/azure-quiz-backend-*.jar"]
 
     J --> O["OIDC: the GitHub token is exchanged<br/>for an Azure one, nothing is stored"]
-    O --> F["az webapp list --query tags.component=='backend'<br/>the name is never written down"]
+    O --> F["az webapp list, filtered on tags.component=='backend'<br/>the name is never written down"]
     F --> D["az webapp deploy --type jar"]
     D --> H["GET /actuator/health<br/>fails the run if it does not answer"]
 ```
@@ -33,9 +40,17 @@ the build. That is the whole reason this pipeline is longer than the backend's.
 
 ```mermaid
 flowchart TD
-    PR["Pull request into develop or main"] --> L["npm run lint<br/>npm run test"]
+    PR["Pull request into develop or main"] --> G
+    M["Merge into main"] --> G
 
-    M["Merge into main"] --> O["OIDC: the GitHub token is exchanged<br/>for an Azure one, nothing is stored"]
+    subgraph G["Quality gate, the same on both paths"]
+        L["npm run lint<br/>npm run format:check<br/>npm run test"]
+        C["trivy fs<br/>CVEs in package-lock.json"]
+        S["trivy secret<br/>credentials in the tree"]
+        Q["CodeQL, javascript-typescript"]
+    end
+
+    G --> O["OIDC: the GitHub token is exchanged<br/>for an Azure one, nothing is stored"]
 
     O --> U["Resolve the backend URL<br/>by tag component=backend"]
     O --> K["Open the vault to this runner,<br/>read backend-api-key, close it again"]
@@ -48,6 +63,27 @@ flowchart TD
     T --> D["Upload dist/azure-quiz-frontend/browser"]
     D --> H["GET the site, then call the backend<br/>through it with the key"]
 ```
+
+## The gate, and why it sits on both paths
+
+Nothing reaches Azure without passing it. Running these checks only on pull requests would leave
+the one path that actually deploys unverified, and a merge is not a rerun of the branch it came
+from: a semantic conflict compiles on both sides and fails once joined. This repository already
+gates its own `plan` and `apply` the same way.
+
+Four checks, answering four different questions:
+
+| Check | Question |
+| --- | --- |
+| `mvn verify` / `npm run lint`, `test` | does it still build and behave |
+| `trivy fs` | is a dependency known to be vulnerable |
+| `trivy secret` | did a credential get committed |
+| CodeQL | does the code itself contain a known vulnerable pattern |
+
+CodeQL is free here because all three repositories are public. GitHub's own secret scanning and
+push protection are enabled on top, at the platform level: they refuse a credential at push time,
+which is earlier than any pipeline can act, but only for the patterns GitHub recognises. The two
+overlap without replacing each other.
 
 ## What holds it together
 

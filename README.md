@@ -42,6 +42,12 @@ The database server, the storage account and its container, the vault and its se
 them. Tearing the environment down therefore starts by removing those blocks, deliberately, in a
 commit of its own.
 
+## Deployment
+
+[docs/deployment-pipelines.md](docs/deployment-pipelines.md) covers how the backend and the
+frontend reach this infrastructure, and why neither pipeline stores a credential or names a
+resource.
+
 ## Branches
 
 - `main`: deployed to Azure

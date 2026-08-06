@@ -15,7 +15,6 @@ APP_NAME="github-oidc-simplon-quiz-bilan"
 REPO="WhiteMuush/simplon-quiz-infrastructure-bilan"
 SUBSCRIPTION_ID="5e683e0f-b00c-48d6-9769-5aaf598de8f1"
 RESOURCE_GROUP="mpetitRG"
-SHARED_RESOURCE_GROUP="rg-shared-prf2026"
 STATE_ACCOUNT="sttfstatempetit"
 
 echo "==> Application registration"
@@ -90,10 +89,6 @@ assign "Role Based Access Control Administrator" \
 # a data plane role. Control plane rights alone would not open the blob.
 assign "Storage Blob Data Contributor" \
   "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Storage/storageAccounts/${STATE_ACCOUNT}"
-
-# The shared App Service Plan is read as a data source. Reader is enough, and it
-# makes it impossible to alter a resource the whole promotion depends on.
-assign "Reader" "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${SHARED_RESOURCE_GROUP}"
 
 echo "==> GitHub repository variables"
 # Variables and not secrets: none of these three values is confidential, and

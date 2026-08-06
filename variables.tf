@@ -53,16 +53,14 @@ variable "subnet_privatelink_prefix" {
   default     = "10.60.3.0/24"
 }
 
-variable "shared_resource_group_name" {
-  description = "Resource group holding the resources shared with the promotion"
+variable "app_service_plan_sku" {
+  description = <<-EOT
+    SKU of the dedicated App Service Plan. B1 is the smallest tier that supports
+    VNet integration, Always On and the health check; B2 doubles the memory
+    available to the JVM if the backend ever needs it.
+  EOT
   type        = string
-  default     = "rg-shared-prf2026"
-}
-
-variable "app_service_plan_name" {
-  description = "Shared App Service Plan hosting the backend, referenced as a data source"
-  type        = string
-  default     = "plan-npr-prf2026"
+  default     = "B1"
 }
 
 variable "static_web_app_location" {

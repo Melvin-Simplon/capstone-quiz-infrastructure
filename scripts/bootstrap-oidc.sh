@@ -12,7 +12,14 @@
 set -euo pipefail
 
 APP_NAME="github-oidc-simplon-quiz-bilan"
-REPO="WhiteMuush/simplon-quiz-infrastructure-bilan"
+OWNER="WhiteMuush"
+
+# One identity for the three repositories rather than three: the trust is carried
+# by the federated credentials below, one per repository and per context, so a
+# shared app registration grants nothing a separate one would have withheld.
+INFRA_REPO="simplon-quiz-infrastructure-bilan"
+BACKEND_REPO="simplon-quiz-backend-bilan"
+FRONTEND_REPO="simplon-quiz-frontend-bilan"
 SUBSCRIPTION_ID="5e683e0f-b00c-48d6-9769-5aaf598de8f1"
 RESOURCE_GROUP="mpetitRG"
 STATE_ACCOUNT="sttfstatempetit"
@@ -34,9 +41,12 @@ echo "==> Federated credentials"
 # and of the repository rather than their names. Asking the API for the prefix
 # it actually signs avoids guessing which form is in use, and keeps working if
 # that form changes again.
-SUB_PREFIX=$(gh api "repos/${REPO}/actions/oidc/customization/sub" --jq '.sub_claim_prefix' 2>/dev/null || true)
-[ -z "$SUB_PREFIX" ] && SUB_PREFIX="repo:${REPO}"
-echo "    subject prefix: $SUB_PREFIX"
+subject_prefix_of() {
+  local repo="$1" prefix
+  prefix=$(gh api "repos/${OWNER}/${repo}/actions/oidc/customization/sub" --jq '.sub_claim_prefix' 2>/dev/null || true)
+  [ -z "$prefix" ] && prefix="repo:${OWNER}/${repo}"
+  echo "$prefix"
+}
 
 # One subject per trusted context. Anything else, another branch or another
 # repository, gets no token at all.
@@ -63,9 +73,22 @@ add_federated_credential() {
   echo "    $name created"
 }
 
-add_federated_credential "main-branch" "${SUB_PREFIX}:ref:refs/heads/main"
-add_federated_credential "pull-request" "${SUB_PREFIX}:pull_request"
-add_federated_credential "nonprod-environment" "${SUB_PREFIX}:environment:nonprod"
+# Credentials are named after the repository they trust. The infrastructure ones
+# predate that convention and keep their original names: renaming them means
+# deleting credentials that work, to gain nothing but symmetry.
+trust_repository() {
+  local repo="$1" main_name="$2" pr_name="$3" env_name="$4" sub
+  sub=$(subject_prefix_of "$repo")
+  echo "    $repo subject prefix: $sub"
+
+  add_federated_credential "$main_name" "${sub}:ref:refs/heads/main"
+  add_federated_credential "$pr_name" "${sub}:pull_request"
+  add_federated_credential "$env_name" "${sub}:environment:nonprod"
+}
+
+trust_repository "$INFRA_REPO" "main-branch" "pull-request" "nonprod-environment"
+trust_repository "$BACKEND_REPO" "backend-main-branch" "backend-pull-request" "backend-nonprod-environment"
+trust_repository "$FRONTEND_REPO" "frontend-main-branch" "frontend-pull-request" "frontend-nonprod-environment"
 
 echo "==> Role assignments"
 assign() {
@@ -94,9 +117,21 @@ echo "==> GitHub repository variables"
 # Variables and not secrets: none of these three values is confidential, and
 # masking them in the logs only makes failures harder to read.
 TENANT_ID=$(az account show --query tenantId -o tsv)
-gh variable set AZURE_CLIENT_ID --repo "$REPO" --body "$APP_ID"
-gh variable set AZURE_TENANT_ID --repo "$REPO" --body "$TENANT_ID"
-gh variable set AZURE_SUBSCRIPTION_ID --repo "$REPO" --body "$SUBSCRIPTION_ID"
+for repo in "$INFRA_REPO" "$BACKEND_REPO" "$FRONTEND_REPO"; do
+  gh variable set AZURE_CLIENT_ID --repo "${OWNER}/${repo}" --body "$APP_ID"
+  gh variable set AZURE_TENANT_ID --repo "${OWNER}/${repo}" --body "$TENANT_ID"
+  gh variable set AZURE_SUBSCRIPTION_ID --repo "${OWNER}/${repo}" --body "$SUBSCRIPTION_ID"
+  echo "    ${repo} set"
+done
+
+echo "==> Deployment environments"
+# A deployment becomes an event with a name and a history, instead of a side
+# effect of a merge. It is also the context one of the federated credentials
+# above is bound to.
+for repo in "$BACKEND_REPO" "$FRONTEND_REPO"; do
+  gh api -X PUT "repos/${OWNER}/${repo}/environments/nonprod" >/dev/null
+  echo "    ${repo} has a nonprod environment"
+done
 
 echo
 echo "Done. Client id: $APP_ID"

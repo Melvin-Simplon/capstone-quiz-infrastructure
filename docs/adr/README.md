@@ -19,3 +19,4 @@ reasoning that produced them.
 | [0008](0008-prevent-destroy-on-stateful-resources.md) | Terraform may not delete what holds data | Accepted |
 | [0009](0009-named-deployer-identity.md) | The identity allowed to write secrets is named, not inferred | Accepted |
 | [0010](0010-tag-based-discovery.md) | Pipelines find their targets by tag, never by name | Accepted |
+| [0011](0011-linked-backend-not-taken.md) | The better answer to 0003, and why it was not applied | Accepted |

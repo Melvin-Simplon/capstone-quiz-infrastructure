@@ -1,44 +1,56 @@
-# simplon-quiz-infrastructure-bilan
+# Simplon Quiz — Infrastructure
 
-Terraform for the non-production environment of the Simplon quiz application on Azure. Everything
-below is applied by the pipeline in this repository; nothing here is created by hand except the two
-things that cannot be, listed under [Bootstrap](#bootstrap).
+[![terraform](https://github.com/WhiteMuush/simplon-quiz-infrastructure-bilan/actions/workflows/terraform.yml/badge.svg?branch=main)](https://github.com/WhiteMuush/simplon-quiz-infrastructure-bilan/actions/workflows/terraform.yml)
+[![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.9-7B42BC?logo=terraform&logoColor=white)](versions.tf)
+[![azurerm](https://img.shields.io/badge/azurerm-~%3E4.0-0078D4?logo=microsoftazure&logoColor=white)](versions.tf)
+[![Region](https://img.shields.io/badge/region-France%20Central-0078D4)](#what-is-deployed)
+[![Auth](https://img.shields.io/badge/auth-OIDC%2C%20no%20stored%20secret-2EA043)](#bootstrap)
+[![State](https://img.shields.io/badge/state-remote%2C%20Entra%20ID-2EA043)](versions.tf)
 
-![Architecture](img/simplon-schéma-infrastructure-quiz.drawio.png)
+Terraform for the non-production environment of the Simplon quiz application on Azure. Every
+resource below is applied by this repository's pipeline. The only two things created by hand are
+the ones that cannot create themselves, and they are listed under [Bootstrap](#bootstrap).
 
 | | |
 | --- | --- |
 | Application | <https://kind-ocean-089457b03.7.azurestaticapps.net> |
 | Backend health | <https://app-simplon-quiz-mpetit.azurewebsites.net/actuator/health> |
 | Resource group | `mpetitRG`, France Central |
+| Pipeline | plan on every pull request, apply on merge into `main` |
 
-## What is in here
+---
 
-A virtual network with three subnets, one per thing that needs its own: outbound integration for
-the backend, the delegated subnet PostgreSQL is injected into, and the one holding the private
-endpoints. Each carries a network security group.
+## What is deployed
 
-On top of that: PostgreSQL Flexible Server, Azure Managed Redis, a storage account, a Key Vault, an
-App Service Plan and the backend web app, and a Static Web App for the frontend.
+A virtual network with three subnets, one for each thing that needs its own: outbound integration
+for the backend, the delegated subnet PostgreSQL is injected into, and the one holding the private
+endpoints. Each carries its own network security group.
 
-Only two components answer the internet: the static site, and the backend. Everything else is
-reached from inside the network, either through a private endpoint or by injection. Why the backend
-is among them, and what guards it, is [0003](docs/adr/0003-public-backend-with-api-key.md).
+On top of it: PostgreSQL Flexible Server, Azure Managed Redis, a storage account, a Key Vault, an
+App Service Plan with the backend web app, and a Static Web App for the frontend.
 
-| File | |
+Two components answer the internet, and only two: the static site, and the backend. Everything else
+is reached from inside the network, through a private endpoint or by injection. Why the backend is
+among them, and what guards it, is [ADR 0003](docs/adr/0003-public-backend-with-api-key.md) — and
+what should replace it is [ADR 0011](docs/adr/0011-linked-backend-not-taken.md).
+
+## Repository layout
+
+| Path | Holds |
 | --- | --- |
 | `network.tf` | virtual network, subnets, security groups |
-| `dns.tf` | the four private DNS zones and their links |
-| `postgres.tf`, `redis.tf`, `storage.tf`, `keyvault.tf` | the data services and their private endpoints |
+| `dns.tf` | the four private DNS zones and their virtual network links |
+| `postgres.tf`, `redis.tf`, `storage.tf`, `keyvault.tf` | data services and their private endpoints |
 | `app-service.tf`, `static-web-app.tf` | the plan, the backend, the site |
-| `docs/adr/` | why each of those looks the way it does |
-| `docs/deployment-pipelines.md` | how the two applications get deployed onto it |
+| `scripts/` | the two things that live outside Terraform, and why |
+| `docs/adr/` | one file per decision worth defending |
+| `docs/deployment-pipelines.md` | how the two applications reach this infrastructure |
 
 ## Running it
 
-Deployments go through the `terraform` workflow: a plan on every pull request, commented back onto
-it, and an apply on merge into `main`. A local run is for reading a plan, and takes two steps
-because Terraform reads the vault's secrets over the data plane, which its firewall filters:
+Deployments go through the `terraform` workflow. A local run is for reading a plan, and takes two
+steps, because Terraform reads the vault's secrets over the data plane and the vault's firewall
+filters it:
 
 ```sh
 scripts/keyvault-firewall.sh add
@@ -46,40 +58,44 @@ terraform plan
 scripts/keyvault-firewall.sh remove
 ```
 
-Reading a plan locally also needs `Key Vault Secrets Officer` on the vault. The pipeline's identity
-has it; a person has to be granted it separately, and
-[0009](docs/adr/0009-named-deployer-identity.md) explains why that is not in the configuration.
+Reading a plan locally also needs the `Key Vault Secrets Officer` role on the vault. The pipeline's
+identity holds it; a person is granted it separately, and
+[ADR 0009](docs/adr/0009-named-deployer-identity.md) explains why that grant is not in the
+configuration.
 
-Deleting anything that holds data is refused on purpose, so tearing this environment down starts by
-removing the `prevent_destroy` blocks, deliberately, in a commit of its own. See
-[0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md).
+Deleting anything holding data is refused on purpose. Tearing this environment down therefore
+begins by removing the `prevent_destroy` blocks, deliberately, in a commit of its own — see
+[ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md).
 
 ## Bootstrap
 
-Two things cannot be created by the Terraform that consumes them, so
+Two things cannot be created by the Terraform that consumes them.
 [`scripts/bootstrap-oidc.sh`](scripts/bootstrap-oidc.sh) creates them once:
 
-- the storage account holding the remote state, reached with an Azure AD identity rather than a key
+- the storage account holding the remote state, reached with an Entra ID identity rather than a key
 - the app registration GitHub authenticates as, with one federated credential per repository and
-  per context, and the role assignments that go with it
+  per context, plus the role assignments that go with it
 
 No client secret exists anywhere. Each workflow proves which repository, branch and environment it
-runs from, and Azure hands back a token that expires with the job.
+runs from, and Azure returns a token that expires with the job.
 
 ## Decisions
 
-[docs/adr](docs/adr/README.md) holds one file per decision worth defending, including the ones that
-cost an apply to discover. Start with
-[0003](docs/adr/0003-public-backend-with-api-key.md) for the weakest point of the design and
-[0005](docs/adr/0005-dedicated-app-service-plan.md) for the constraint that forced this environment
-off the shared App Service plan.
+[docs/adr](docs/adr/README.md) holds one record per decision, including the four that only became
+apparent by applying. Two are worth opening first:
+
+- [ADR 0003](docs/adr/0003-public-backend-with-api-key.md) — the weakest point of the design,
+  named rather than hidden
+- [ADR 0005](docs/adr/0005-dedicated-app-service-plan.md) — the platform limit that forced this
+  environment off the promotion's shared App Service plan
 
 ## Branches
 
-- `main`: applied to Azure
-- `develop`: integration
-- `feat/*`, `fix/*`, `ci/*`, `docs/*`, `chore/*`: one per change, merged into `develop` by pull
-  request
+| Branch | Role |
+| --- | --- |
+| `main` | applied to Azure |
+| `develop` | integration |
+| `feat/*`, `fix/*`, `ci/*`, `docs/*`, `chore/*` | one per change, merged into `develop` by pull request |
 
 Both protected branches refuse deletion, force-pushes, unsigned commits, direct writes, and any
 merge whose checks have not passed.

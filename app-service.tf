@@ -1,8 +1,24 @@
+# Dedicated rather than the promotion's shared plan, which is full: a plan
+# accepts exactly two VNet integrations, one virtual interface each on its
+# workers, and the two are taken by another trainee's network and the trainer's.
+# The limit is a property of the hardware, not of the tier, so scaling the shared
+# plan up would not have made room. See the ADR.
+resource "azurerm_service_plan" "backend" {
+  name                = "plan-${local.name_suffix}"
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = data.azurerm_resource_group.main.location
+
+  os_type  = "Linux"
+  sku_name = var.app_service_plan_sku
+
+  tags = merge(local.common_tags, { component = "backend" })
+}
+
 resource "azurerm_linux_web_app" "backend" {
   name                = "app-${local.name_suffix}"
   resource_group_name = data.azurerm_resource_group.main.name
-  location            = data.azurerm_service_plan.shared.location
-  service_plan_id     = data.azurerm_service_plan.shared.id
+  location            = azurerm_service_plan.backend.location
+  service_plan_id     = azurerm_service_plan.backend.id
 
   https_only = true
 

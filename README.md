@@ -7,8 +7,12 @@ Terraform infrastructure for the non-production environment of the Simplon quiz 
 ## Stack
 
 App Service (backend), Static Web Apps (frontend), PostgreSQL Flexible Server, Azure Managed
-Redis, Storage Account, Key Vault. All in `mpetitRG`. The App Service Plan `plan-npr-prf2026` is
-shared and only referenced.
+Redis, Storage Account, Key Vault. All in `mpetitRG`, on an App Service Plan of its own.
+
+The promotion's shared plan `plan-npr-prf2026` was the intended host, but an App Service plan
+accepts exactly two VNet integrations, one virtual interface each on its workers, and both were
+taken. That limit belongs to the hardware rather than to the pricing tier, so scaling the shared
+plan up would not have made room.
 
 ## Running it
 

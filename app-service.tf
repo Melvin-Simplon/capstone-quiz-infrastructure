@@ -51,6 +51,26 @@ resource "azurerm_linux_web_app" "backend" {
       java_server_version = "21"
       java_version        = "21"
     }
+
+    # The health check only covers an instance that stopped answering entirely.
+    # This covers the other failure mode, a JVM still alive but serving errors,
+    # which the probe on /actuator/health would not necessarily catch.
+    auto_heal_setting {
+      trigger {
+        status_code {
+          status_code_range = "500-599"
+          count             = 20
+          interval          = "00:05:00"
+        }
+      }
+
+      action {
+        action_type = "Recycle"
+        # Never recycle an instance that just started: a cold start replaying the
+        # Flyway migrations legitimately takes a while.
+        minimum_process_execution_time = "00:05:00"
+      }
+    }
   }
 
   app_settings = {

@@ -40,6 +40,10 @@ resource "azurerm_postgresql_flexible_server" "main" {
   depends_on = [azurerm_private_dns_zone_virtual_network_link.postgres]
 
   tags = merge(local.common_tags, { component = "database" })
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Created empty on purpose: the schema and its data come from the Flyway
@@ -49,8 +53,4 @@ resource "azurerm_postgresql_flexible_server_database" "main" {
   server_id = azurerm_postgresql_flexible_server.main.id
   charset   = "UTF8"
   collation = "en_US.utf8"
-
-  lifecycle {
-    prevent_destroy = false
-  }
 }

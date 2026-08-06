@@ -24,6 +24,11 @@ Terraform therefore has to be let through, and that rule is rewritten on every r
 address changes. The storage account needs nothing of the sort: it is closed to the internet
 altogether, its container being created over the Resource Manager API.
 
+The database server, the storage account and its container, the vault and its secrets carry
+`prevent_destroy`. Terraform refuses to delete them, and refuses any change that would recreate
+them. Tearing the environment down therefore starts by removing those blocks, deliberately, in a
+commit of its own.
+
 ## Branches
 
 - `main`: deployed to Azure

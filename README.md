@@ -22,6 +22,10 @@ the ones that cannot create themselves, and they are listed under [Bootstrap](#b
 
 ## What is deployed
 
+![Architecture of the non-production environment: the three repositories and their pipelines, the
+OIDC sign-in into Azure, and the resource group with its virtual network, its three subnets and the
+services they hold](img/simplon-sch%C3%A9ma-infrastructure-quiz.drawio.png)
+
 A virtual network with three subnets, one for each thing that needs its own: outbound integration
 for the backend, the delegated subnet PostgreSQL is injected into, and the one holding the private
 endpoints. Each carries its own network security group.

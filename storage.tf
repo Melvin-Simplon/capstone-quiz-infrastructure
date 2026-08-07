@@ -37,10 +37,6 @@ resource "azurerm_storage_account" "main" {
   }
 
   tags = merge(local.common_tags, { component = "storage" })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "azurerm_storage_container" "uploads" {
@@ -51,10 +47,6 @@ resource "azurerm_storage_container" "uploads" {
   # Resource Manager API, the name form through the blob data plane, which the
   # account firewall blocks.
   storage_account_id = azurerm_storage_account.main.id
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "azurerm_private_endpoint" "blob" {

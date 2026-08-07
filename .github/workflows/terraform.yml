@@ -9,10 +9,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: terraform-${{ github.ref }}
-  cancel-in-progress: false
-
 env:
   ARM_USE_OIDC: true
   ARM_USE_AZUREAD: true
@@ -85,6 +81,15 @@ jobs:
     needs: [lint, security]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # The state lives in a single blob, so a run on one branch races a run on
+    # another for its lease. Keying this on the ref, as it was, put every branch
+    # in its own queue and let a pull request plan die on LeaseAlreadyPresent
+    # while an apply held the lock on main. The lock timeout does not save it:
+    # when the lease is taken mid-write the blob carries no terraformlockid and
+    # Terraform gives up instead of waiting.
+    concurrency:
+      group: terraform-state-nonprod
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -142,6 +147,9 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: nonprod
+    concurrency:
+      group: terraform-state-nonprod
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write

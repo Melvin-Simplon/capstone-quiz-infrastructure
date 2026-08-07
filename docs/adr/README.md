@@ -16,7 +16,8 @@ reasoning that produced them.
 | [0005](0005-dedicated-app-service-plan.md) | The backend runs on a plan of its own | Accepted |
 | [0006](0006-key-vault-firewall-outside-state.md) | The vault's allowed addresses are not part of the desired state | Accepted |
 | [0007](0007-storage-closed-to-the-internet.md) | The storage account has no public surface at all | Accepted |
-| [0008](0008-prevent-destroy-on-stateful-resources.md) | Terraform may not delete what holds data | Accepted |
+| [0008](0008-prevent-destroy-on-stateful-resources.md) | Terraform may not delete what holds data | Superseded by [0012](0012-the-environment-must-be-reproducible.md) |
 | [0009](0009-named-deployer-identity.md) | The identity allowed to write secrets is named, not inferred | Accepted |
 | [0010](0010-tag-based-discovery.md) | Pipelines find their targets by tag, never by name | Accepted |
 | [0011](0011-linked-backend-not-taken.md) | The better answer to 0003, and why it was not applied | Accepted |
+| [0012](0012-the-environment-must-be-reproducible.md) | Nothing is protected from destruction, so the rebuild can be proven | Accepted |

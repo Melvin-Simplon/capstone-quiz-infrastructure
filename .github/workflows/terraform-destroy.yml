@@ -1,0 +1,81 @@
+name: terraform destroy
+
+# Deliberately its own file. Kept out of terraform.yml so that no push, no pull
+# request and no future edit to a trigger there can ever reach a destroy: the
+# only way in is someone opening this workflow and typing the resource group
+# name by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type the resource group name to confirm the destruction'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  ARM_USE_OIDC: true
+  ARM_USE_AZUREAD: true
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    environment: nonprod
+    # Same group as plan and apply: the state is one blob, and a destroy racing
+    # a plan would fight over the same lease.
+    concurrency:
+      group: terraform-state-nonprod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check the confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          EXPECTED: mpetitRG
+        run: |
+          if [ "$CONFIRM" != "$EXPECTED" ]; then
+            echo "Expected the resource group name, got '$CONFIRM'. Nothing was touched." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.9.8
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Sign in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Open the Key Vault to this runner
+        run: scripts/keyvault-firewall.sh add
+
+      # Printed before anything is removed, so the job log carries a record of
+      # what the run was about to take away.
+      - name: Plan the destruction
+        run: terraform plan -destroy -input=false -no-color -lock-timeout=120s
+
+      # Stops on the first resource carrying prevent_destroy, which is the
+      # intent of ADR 0008: the database, the storage account and the vault are
+      # not disposable. Removing those blocks is a pull request someone has to
+      # write and someone has to approve, not a button.
+      - name: Destroy
+        run: terraform destroy -input=false -auto-approve -lock-timeout=120s
+
+      - name: Close the Key Vault again
+        if: always()
+        run: scripts/keyvault-firewall.sh remove

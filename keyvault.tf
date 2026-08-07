@@ -40,8 +40,7 @@ resource "azurerm_key_vault" "main" {
   tags = merge(local.common_tags, { component = "secrets" })
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [network_acls[0].ip_rules]
+    ignore_changes = [network_acls[0].ip_rules]
   }
 }
 
@@ -71,10 +70,6 @@ resource "azurerm_key_vault_secret" "postgres_admin_password" {
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [azurerm_role_assignment.deployer_secrets]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "azurerm_key_vault_secret" "redis_primary_key" {
@@ -83,10 +78,6 @@ resource "azurerm_key_vault_secret" "redis_primary_key" {
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [azurerm_role_assignment.deployer_secrets]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # Generated here rather than handed over by anyone: the frontend reads it back
@@ -97,10 +88,6 @@ resource "azurerm_key_vault_secret" "backend_api_key" {
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [azurerm_role_assignment.deployer_secrets]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "azurerm_private_endpoint" "keyvault" {

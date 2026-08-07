@@ -31,37 +31,33 @@ resource "azurerm_private_dns_zone" "keyvault" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-  name                  = "link-postgres"
-  resource_group_name   = data.azurerm_resource_group.main.name
-  private_dns_zone_name = azurerm_private_dns_zone.postgres.name
-  virtual_network_id    = azurerm_virtual_network.main.id
+  name                = "link-postgres"
+  private_dns_zone_id = azurerm_private_dns_zone.postgres.id
+  virtual_network_id  = azurerm_virtual_network.main.id
 
   tags = merge(local.common_tags, { component = "network" })
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "redis" {
-  name                  = "link-redis"
-  resource_group_name   = data.azurerm_resource_group.main.name
-  private_dns_zone_name = azurerm_private_dns_zone.redis.name
-  virtual_network_id    = azurerm_virtual_network.main.id
+  name                = "link-redis"
+  private_dns_zone_id = azurerm_private_dns_zone.redis.id
+  virtual_network_id  = azurerm_virtual_network.main.id
 
   tags = merge(local.common_tags, { component = "network" })
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
-  name                  = "link-blob"
-  resource_group_name   = data.azurerm_resource_group.main.name
-  private_dns_zone_name = azurerm_private_dns_zone.blob.name
-  virtual_network_id    = azurerm_virtual_network.main.id
+  name                = "link-blob"
+  private_dns_zone_id = azurerm_private_dns_zone.blob.id
+  virtual_network_id  = azurerm_virtual_network.main.id
 
   tags = merge(local.common_tags, { component = "network" })
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "keyvault" {
-  name                  = "link-keyvault"
-  resource_group_name   = data.azurerm_resource_group.main.name
-  private_dns_zone_name = azurerm_private_dns_zone.keyvault.name
-  virtual_network_id    = azurerm_virtual_network.main.id
+  name                = "link-keyvault"
+  private_dns_zone_id = azurerm_private_dns_zone.keyvault.id
+  virtual_network_id  = azurerm_virtual_network.main.id
 
   tags = merge(local.common_tags, { component = "network" })
 }

@@ -39,7 +39,9 @@ resource "azurerm_subnet" "postgres" {
 
   # Added by Azure itself when the server is injected here, so declaring it is
   # what stops Terraform from trying to take it away on every run.
-  service_endpoints = ["Microsoft.Storage"]
+  service_endpoint {
+    service = "Microsoft.Storage"
+  }
 
   delegation {
     name = "flexibleservers"

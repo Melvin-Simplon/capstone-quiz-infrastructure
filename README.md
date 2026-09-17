@@ -67,21 +67,29 @@ identity holds it; a person is granted it separately, and
 [ADR 0009](docs/adr/0009-named-deployer-identity.md) explains why that grant is not in the
 configuration.
 
-Deleting anything holding data is refused on purpose. Tearing this environment down therefore
-begins by removing the `prevent_destroy` blocks, deliberately, in a commit of its own, see
-[ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md).
+Nothing is protected from deletion. [ADR 0012](docs/adr/0012-the-environment-must-be-reproducible.md)
+removed the `prevent_destroy` blocks that [ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md)
+had put on the seven resources holding state, so that this environment can actually be rebuilt from
+this repository rather than only claiming it can. Tearing it down is the
+[destroy workflow](.github/workflows/terraform-destroy.yml), or `make destroy`, and it takes the
+database with it.
 
 ## Bootstrap
 
-Two things cannot be created by the Terraform that consumes them.
-[`scripts/bootstrap-oidc.sh`](scripts/bootstrap-oidc.sh) creates them once:
+One thing cannot be created by the Terraform that consumes it, and
+[`scripts/bootstrap-oidc.sh`](scripts/bootstrap-oidc.sh) creates it once: the app registration
+GitHub authenticates as, with one federated credential per repository and per context, plus the
+role assignments that go with it. Run it with `make bootstrap`.
 
-- the storage account holding the remote state, reached with an Entra ID identity rather than a key
-- the app registration GitHub authenticates as, with one federated credential per repository and
-  per context, plus the role assignments that go with it
+Every path to Azure goes through OIDC. Each workflow proves which repository, branch and
+environment it runs from, and Azure returns a token that expires with the job, so no Azure
+credential is stored anywhere.
 
-No client secret exists anywhere. Each workflow proves which repository, branch and environment it
-runs from, and Azure returns a token that expires with the job.
+There is exactly one long lived secret, and it is not an Azure one. The state lives on HCP
+Terraform, which authenticates with a token: `TF_API_TOKEN` as a repository secret, and a local
+`terraform login` for a plan read from a workstation.
+[ADR 0013](docs/adr/0013-state-on-terraform-cloud.md) records what that costs and why it is worth
+paying here.
 
 ## Decisions
 

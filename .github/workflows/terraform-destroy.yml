@@ -21,6 +21,12 @@ env:
   ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  # The state lives on HCP Terraform, which authenticates with a token and not
+  # with the OIDC trust everything else here uses. It is the only long lived
+  # credential in this project, and ADR 0013 records why it is worth its cost.
+  # The lint job does not need it: `terraform init -backend=false` skips the
+  # cloud block entirely, which was verified rather than assumed.
+  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
 
 jobs:
   destroy:
@@ -69,10 +75,11 @@ jobs:
       - name: Plan the destruction
         run: terraform plan -destroy -input=false -no-color -lock-timeout=120s
 
-      # Stops on the first resource carrying prevent_destroy, which is the
-      # intent of ADR 0008: the database, the storage account and the vault are
-      # not disposable. Removing those blocks is a pull request someone has to
-      # write and someone has to approve, not a button.
+      # Runs to completion. ADR 0012 removed the seven prevent_destroy blocks,
+      # so nothing stops this: the database, the storage account and the vault
+      # go with the rest. What is left against an accident is the plan printed
+      # above, the resource group name typed into the dispatch form, and the
+      # approval on the nonprod environment.
       - name: Destroy
         run: terraform destroy -input=false -auto-approve -lock-timeout=120s
 

@@ -131,6 +131,50 @@ once.
 
 ## The Makefile
 
+### Layout
+
+```
+Makefile                        entry point: configuration, includes, nothing else
+makefiles/
+  help.mk                       the default target, built from the target comments
+  doctor.mk                     doctor
+  bootstrap.mk                  bootstrap
+  infra.mk                      plan, infra, destroy
+  backend.mk                    backend
+  frontend.mk                   frontend
+  deploy.mk                     deploy, one-shot
+  status.mk                     status, logs
+scripts/
+  bootstrap-oidc.sh             existing, corrected for the new repository names
+  keyvault-firewall.sh          existing, called by the workflows and not from here
+  pipeline/
+    lib.sh                      sourced by the others: logging, guards, gh helpers
+    doctor.sh                   every prerequisite check
+    dispatch.sh                 dispatch one workflow and follow its run
+    status.sh                   last runs, and the URLs when az is available
+    destroy.sh                  the confirmation and the dispatch
+```
+
+The separation is strict and it is the point of the structure. A `.mk` fragment
+declares targets, wires dependencies between them and passes configuration down.
+It holds no logic, no loop and no conditional beyond target prerequisites. Every
+decision lives in a script under `scripts/pipeline/`, which is testable on its own,
+readable by someone who does not know Make, and debuggable by running it directly.
+
+The root `Makefile` carries the configuration that everything else reads, the
+organisation and the three repository names, the resource group, the HCP
+workspace, and it includes the fragments. It declares no target of its own beyond
+setting `help` as the default goal, so that a bare `make` lists what exists rather
+than deploying anything.
+
+`dispatch.sh` is the single place that knows how to trigger a workflow and follow
+its run. `infra`, `backend` and `frontend` all call it with different arguments
+rather than each repeating the `gh workflow run` and `gh run watch` pair. When the
+way a run is followed has to change, it changes once.
+
+All recipes run under `bash` with `set -euo pipefail`, set once in the root
+`Makefile` through `SHELL` and `.SHELLFLAGS` rather than repeated per recipe.
+
 ### Targets
 
 | Target | Effect |

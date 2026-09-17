@@ -73,11 +73,16 @@ jobs:
         with:
           tflint_version: v0.64.0
       - name: Lint the provider usage
+        # tflint --init pulls its ruleset through the GitHub API. Unauthenticated
+        # it gets sixty requests an hour, counted per address and shared with
+        # every other runner behind it, so the quota is routinely gone before
+        # this job starts and it answers 403. The token raises that to a
+        # thousand an hour for this repository, which is the actual fix: the
+        # retry below cannot help against a quota that is already spent.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # tflint --init pulls its ruleset through the GitHub API, which
-          # answers 500 often enough to stop a deployment that has nothing
-          # wrong with it. Retried rather than left to decide on its own
-          # whether today is a good day to deploy.
+          # Kept for the genuine 500s, which happen too.
           for attempt in 1 2 3; do
             tflint --init && break
             if [ "$attempt" = 3 ]; then

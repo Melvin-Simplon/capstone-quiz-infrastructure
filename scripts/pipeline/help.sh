@@ -65,22 +65,91 @@ print_targets() {
 }
 
 # Quoted heredoc, so the block art survives untouched.
-banner() {
-  printf '\033[1;%sm\n' "${BANNER_COLOR}"
+banner_art() {
   cat <<'BANNER'
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⢀⡦⢦⡀⠀⢹⠄⠀⣠⠤⠀⠢⢤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠤⠆⠦⠄⠖⠒⣆⠀⠀⠀⠀⠀⠀⠀⠀⡀⣠⣀⣀⠀⠀⠀⢠⠟⠊⡉⠉⠓⣄⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠫⣀⡬⠹⡆⣘⢣⠚⠀⠀⠀⡀⠀⠉⢦⡀⠀⠀⣀⡀⠀⠨⡅⠀⠀⠀⠀⠀⢘⠂⠀⠀⠀⠀⠀⢐⣞⠛⠉⠀⠉⠛⣰⡀⡏⠀⢼⠁⠀⢀⣭⠁⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⢀⢀⣀⠀⠀⠀⠏⡖⣚⠀⢀⡸⠋⠉⢹⠀⣽⡇⢠⠏⠉⠉⠓⢦⣹⡀⡠⡆⡀⣠⢇⠔⠂⠃⢢⡀⠀⢾⠄⠀⡶⠒⣄⠀⠀⢿⢧⠀⠈⠓⡿⠊⠉⠀⠀⠀⠀⠀⠀
-⠀⢀⠖⣦⠽⠒⠱⠪⠝⢦⣴⣡⢭⠀⠀⢳⣀⢀⣉⡸⠧⠀⣈⠇⠀⠀⡀⠠⡥⡱⡛⣝⡽⢇⠅⠀⠀⠀⠸⠇⠀⠷⢧⢀⢉⡹⠮⠀⠀⣹⠾⣀⢤⠲⣞⡉⣉⣙⠘⠲⣄⡀⠀
-⢰⠿⡯⠁⡠⡤⣀⠀⠀⠀⠈⠑⢎⢦⡀⠀⠈⠘⠉⠁⠀⠀⢛⠀⠀⠀⠉⡵⢃⣿⣛⣝⣷⡘⢯⠉⠁⠀⠀⢩⡆⠀⠈⠛⠉⠓⠁⠀⣠⡽⠃⠓⠉⠀⠀⠀⢀⡈⠓⣦⡈⢧⠆
-⣼⡰⡅⠸⣁⣚⠀⢺⠀⠀⢀⠀⠀⠀⢳⢦⣠⠦⠤⠄⣀⠀⢀⡷⠗⣃⡼⢏⢃⡛⡽⢿⡓⢚⠽⠒⠠⢤⠤⠒⠁⠀⣠⣤⠤⣤⣀⠞⠃⢀⢤⡀⠀⠀⣄⣳⠋⡙⢦⠈⣆⠼⡟
-⢸⣧⠩⢦⣀⢁⣀⠏⠀⠀⠈⠉⠉⠈⠁⠀⠀⠉⠓⠘⠓⠚⠥⣠⠔⠀⠀⢀⠎⠡⣸⡍⠎⢣⠀⠀⠉⣎⡑⢲⠴⠼⠁⠐⠘⠋⠀⠉⠒⠐⠊⠁⠀⠀⣜⣥⠐⠧⠚⢩⣗⠀⠃
-⠀⠉⠱⠾⠽⡫⠄⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣀⠀⠀⠀⠀⠀⡥⡇⠀⠀⠀⠀⢀⡔⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠹⠦⢶⡞⠟⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠫⢤⢀⠾⠁⠹⣀⠀⣠⠝⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⢈⣾⣿⡇⠀⠀⠀⠀⠀⢀⣼⡇⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⣸⣿⣿⡇⠀⠀⠀⠀⣴⣿⣿⠃⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣇⠀⠀⢀⣾⣿⣿⣿⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣴⣿⣿⣿⣿⣿⣿⣷⣿⣿⣿⣿⡟⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⢰⡿⠉⠀⡜⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀⠀⠀
+⠀⠀⠒⠒⠸⣿⣄⢀⣃⣿⣿⡟⠉⠉⠉⢹⣿⡇⠀⠀⠀⠀⠀
+⠀⠀⠚⠉⠀⠈⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠁⠘⠠⠁⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠛⠛⠛⠛⠛⠁⠀⠒⠤⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⠀⠀⠀⠀⠀⠀
 BANNER
-  printf '\033[0m'
+}
+
+# Every line of the art is exactly this wide. Kept as a constant rather than
+# measured, because bash pads `%-*s` by bytes and each braille cell is three of
+# them, so a computed width would indent the right column into the art.
+BANNER_WIDTH=23
+BANNER_GAP=2
+
+# The header beside the art, as colour and text pairs. Wrapped here rather than
+# written pre-wrapped, so it still reads on a narrow terminal.
+header_lines() {
+  local width="$1"
+  local -a pairs=(
+    "${BANNER_COLOR}|Simplon quiz, deployment control"
+    "|"
+    "${HEADER_COLOR}|Usage: make <target> [VAR=value]"
+    "${HEADER_COLOR}|Nothing here touches Azure: each target dispatches a workflow and follows its run."
+    "${HEADER_COLOR}|Override a variable on the command line, not through the environment."
+    "${HEADER_COLOR}|Every run appends to ${LOG_FILE:-.logs/pipeline.log}, timestamped and without colours."
+  )
+
+  local pair colour text line
+  for pair in "${pairs[@]}"; do
+    colour="${pair%%|*}"
+    text="${pair#*|}"
+    if [[ -z "${text}" ]]; then
+      printf '\n'
+      continue
+    fi
+    while IFS= read -r line; do
+      printf '\033[%sm%s\033[0m\n' "${colour:-0}" "${line}"
+    done < <(printf '%s\n' "${text}" | fold -s -w "${width}")
+  done
+}
+
+# The art on the left, the header on the right, the shorter of the two centred
+# against the taller. Falls back to stacking when the terminal cannot hold both,
+# rather than wrapping the art into itself.
+print_header() {
+  local cols; cols=$(tput cols 2>/dev/null || echo 80)
+  local avail=$(( cols - BANNER_WIDTH - BANNER_GAP ))
+
+  mapfile -t art < <(banner_art)
+
+  if [[ "${avail}" -lt 32 ]]; then
+    printf '\033[1;%sm\n' "${BANNER_COLOR}"
+    printf '%s\n' "${art[@]}"
+    printf '\033[0m\n'
+    header_lines "$(( cols > 32 ? cols : 32 ))"
+    return
+  fi
+
+  mapfile -t text < <(header_lines "${avail}")
+
+  local rows=$(( ${#art[@]} > ${#text[@]} ? ${#art[@]} : ${#text[@]} ))
+  local offset=$(( (${#art[@]} - ${#text[@]}) / 2 ))
+  [[ "${offset}" -lt 0 ]] && offset=0
+
+  local i left right pad
+  echo
+  for (( i = 0; i < rows; i++ )); do
+    left="${art[i]:-}"
+    right=""
+    [[ "${i}" -ge "${offset}" ]] && right="${text[i - offset]:-}"
+
+    pad=$(( BANNER_WIDTH - ${#left} + BANNER_GAP ))
+    [[ "${pad}" -lt 1 ]] && pad=1
+
+    printf '\033[1;%sm%s\033[0m%*s%s\n' \
+      "${BANNER_COLOR}" "${left}" "${pad}" '' "${right}"
+  done
+  echo
 }
 
 say() { printf '\033[%sm%s\033[0m\n' "$1" "$2"; }
@@ -88,14 +157,7 @@ say() { printf '\033[%sm%s\033[0m\n' "$1" "$2"; }
 main() {
   # Only when a human is watching: clearing breaks a pipe and litters a CI log.
   [[ -t 1 ]] && clear
-  banner
-  say "$BANNER_COLOR" "  Simplon quiz, deployment control"
-  echo
-  say "$HEADER_COLOR" "Usage: make <target> [VAR=value]"
-  say "$HEADER_COLOR" "Nothing here touches Azure: each target dispatches a workflow and follows its run."
-  say "$HEADER_COLOR" "Override a variable on the command line, not through the environment."
-  say "$HEADER_COLOR" "Every run appends to ${LOG_FILE:-.logs/pipeline.log}, timestamped and without colours."
-  echo
+  print_header
   say "1;$WARNING_COLOR" "⚠️  destroy tears down the whole environment, and nothing is protected any more"
   mapfile -t files < <(makefiles)
   print_targets "${files[@]}"

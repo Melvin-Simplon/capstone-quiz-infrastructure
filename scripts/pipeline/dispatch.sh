@@ -4,9 +4,13 @@
 # The single place that knows how to do this. Every deployment target calls it
 # with different arguments rather than repeating the dispatch and the wait, so
 # the way a run is followed changes here and nowhere else.
+#
+# A run that deploys is reported as changed, not ok: this is the one script
+# here that acts on the world.
 
 set -euo pipefail
 
+ORIGINAL_ARGS="$*"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/pipeline/lib.sh
 source "${HERE}/lib.sh"
@@ -50,6 +54,8 @@ done
 require_cmd gh "See https://cli.github.com"
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated. Run: gh auth login"
 
+task "${LABEL} : dispatch ${WORKFLOW} on ${REPO}"
+
 # The id of the newest run before dispatching, so the one that appears after can
 # be told apart. `gh workflow run` returns nothing identifying the run it just
 # created, which is the whole difficulty here.
@@ -60,9 +66,11 @@ latest_run_id() {
 
 before=$(latest_run_id)
 
-log_info "${LABEL}: dispatching ${WORKFLOW} on ${REPO} (${REF})"
-if ! gh workflow run "${WORKFLOW}" --repo "${REPO}" --ref "${REF}" "${FIELDS[@]+"${FIELDS[@]}"}"; then
-    die "${LABEL}: the dispatch was refused. Does ${WORKFLOW} declare workflow_dispatch on ${REF}?"
+if ! gh workflow run "${WORKFLOW}" --repo "${REPO}" --ref "${REF}" "${FIELDS[@]+"${FIELDS[@]}"}" 2>/dev/null; then
+    report_failed "${LABEL}" "the dispatch was refused"
+    hint "does ${WORKFLOW} declare workflow_dispatch on ${REF}?"
+    recap "${LABEL}"
+    exit 1
 fi
 
 # GitHub registers the run a moment after accepting the dispatch, so the id is
@@ -76,25 +84,27 @@ for _ in $(seq 1 30); do
 done
 
 if [[ "${run_id}" == "0" ]]; then
-    die "${LABEL}: dispatched, but no new run appeared after a minute. Check ${REPO} on GitHub."
+    report_unreachable "${LABEL}" "dispatched, but no new run appeared after a minute"
+    hint "check https://github.com/${REPO}/actions"
+    recap "${LABEL}"
+    exit 1
 fi
 
 url=$(gh run view "${run_id}" --repo "${REPO}" --json url --jq .url 2>/dev/null || echo '')
-log_info "${LABEL}: run ${run_id} started"
-[[ -n "${url}" ]] && log_hint "${url}"
+hint "run ${run_id}${url:+ at ${url}}"
 
 # --exit-status makes a failed run fail this script, which stops the chain in
 # `make deploy` instead of moving on to a component that cannot work.
 if gh run watch "${run_id}" --repo "${REPO}" --exit-status >/dev/null 2>&1; then
-    log_ok "${LABEL}: succeeded"
-    if [[ "${PRINT_LOG}" -eq 1 ]]; then
-        gh run view "${run_id}" --repo "${REPO}" --log 2>/dev/null || true
-    fi
+    report_changed "${LABEL}" "run ${run_id} succeeded"
+    [[ "${PRINT_LOG}" -eq 1 ]] && { gh run view "${run_id}" --repo "${REPO}" --log 2>/dev/null || true; }
+    recap "${LABEL}"
     exit 0
 fi
 
-log_fail "${LABEL}: the run failed"
-[[ -n "${url}" ]] && log_hint "${url}"
+report_failed "${LABEL}" "run ${run_id} failed"
 # The failing job's log is not printed here on purpose: it is long, and the URL
-# above opens the part that matters without burying the rest of the output.
+# opens the part that matters without burying the rest of the output.
+[[ -n "${url}" ]] && hint "${url}"
+recap "${LABEL}"
 exit 1

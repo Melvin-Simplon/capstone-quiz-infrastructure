@@ -87,6 +87,7 @@ main() {
   say "$HEADER_COLOR" "Usage: make <target> [VAR=value]"
   say "$HEADER_COLOR" "Nothing here touches Azure: each target dispatches a workflow and follows its run."
   say "$HEADER_COLOR" "Override a variable on the command line, not through the environment."
+  say "$HEADER_COLOR" "Every run appends to ${LOG_FILE:-.logs/pipeline.log}, timestamped and without colours."
   echo
   say "1;$WARNING_COLOR" "⚠️  destroy tears down the whole environment, and nothing is protected any more"
   mapfile -t files < <(makefiles)

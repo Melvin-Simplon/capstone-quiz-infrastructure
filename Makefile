@@ -25,6 +25,11 @@ OIDC_APP_NAME   ?= github-oidc-simplon-quiz-bilan
 TF_ORG          ?= WhiteMuush-Organizations
 TF_WORKSPACE    ?= simplon-quiz-nonprod
 
+# Every target appends to this, timestamped and without escape sequences.
+# Override it to keep a transcript of one operation on its own:
+#   make one-shot LOG_FILE=.logs/rebuild-2026-09-17.log
+LOG_FILE        ?= .logs/pipeline.log
+
 PIPELINE        := scripts/pipeline
 
 # Read by the scripts rather than passed as arguments: they all need the same
@@ -32,7 +37,7 @@ PIPELINE        := scripts/pipeline
 # without adding clarity.
 export ORG INFRA_REPO BACKEND_REPO FRONTEND_REPO
 export RESOURCE_GROUP SUBSCRIPTION_ID TENANT_ID OIDC_APP_NAME
-export TF_ORG TF_WORKSPACE
+export TF_ORG TF_WORKSPACE LOG_FILE
 
 include makefiles/component.mk
 include makefiles/infra.mk

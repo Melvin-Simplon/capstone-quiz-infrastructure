@@ -5,6 +5,17 @@ on:
     branches: [develop, main]
   push:
     branches: [main]
+  # Triggered by hand, and by the Makefile that drives this repository. The
+  # event alone no longer says what to do, because a manual run could mean
+  # either, so the choice is an input and the two jobs below read it.
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to run'
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
 
 permissions:
   contents: read
@@ -79,7 +90,7 @@ jobs:
 
   plan:
     needs: [lint, security]
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || inputs.action == 'plan'
     runs-on: ubuntu-latest
     # The state lives in a single blob, so a run on one branch races a run on
     # another for its lease. Keying this on the ref, as it was, put every branch
@@ -125,7 +136,10 @@ jobs:
         if: always()
         run: scripts/keyvault-firewall.sh remove
 
+      # Skipped on a manual run: there is no pull request to comment on, and
+      # context.issue.number would be empty. The plan is still in the job log.
       - name: Comment plan on the pull request
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
@@ -144,7 +158,7 @@ jobs:
 
   apply:
     needs: [lint, security]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || inputs.action == 'apply'
     runs-on: ubuntu-latest
     environment: nonprod
     concurrency:

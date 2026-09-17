@@ -67,9 +67,12 @@ identity holds it; a person is granted it separately, and
 [ADR 0009](docs/adr/0009-named-deployer-identity.md) explains why that grant is not in the
 configuration.
 
-Deleting anything holding data is refused on purpose. Tearing this environment down therefore
-begins by removing the `prevent_destroy` blocks, deliberately, in a commit of its own, see
-[ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md).
+Nothing is protected from deletion. [ADR 0012](docs/adr/0012-the-environment-must-be-reproducible.md)
+removed the `prevent_destroy` blocks that [ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md)
+had put on the seven resources holding state, so that this environment can actually be rebuilt from
+this repository rather than only claiming it can. Tearing it down is the
+[destroy workflow](.github/workflows/terraform-destroy.yml), or `make destroy`, and it takes the
+database with it.
 
 ## Bootstrap
 

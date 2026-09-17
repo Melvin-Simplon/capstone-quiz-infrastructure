@@ -61,6 +61,7 @@ jobs:
         run: terraform init -input=false
 
       - name: Sign in to Azure
+        id: azure
         uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -83,6 +84,10 @@ jobs:
       - name: Destroy
         run: terraform destroy -input=false -auto-approve -lock-timeout=120s
 
+      # Conditioned on the sign in rather than on always(): when Terraform fails
+      # at init the sign in never ran, and an unconditional close then fails
+      # with "Please run 'az login'", adding a second error to a job that only
+      # had one and burying the real cause.
       - name: Close the Key Vault again
-        if: always()
+        if: always() && steps.azure.outcome == 'success'
         run: scripts/keyvault-firewall.sh remove

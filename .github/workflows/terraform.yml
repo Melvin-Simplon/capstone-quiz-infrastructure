@@ -74,7 +74,19 @@ jobs:
           tflint_version: v0.64.0
       - name: Lint the provider usage
         run: |
-          tflint --init
+          # tflint --init pulls its ruleset through the GitHub API, which
+          # answers 500 often enough to stop a deployment that has nothing
+          # wrong with it. Retried rather than left to decide on its own
+          # whether today is a good day to deploy.
+          for attempt in 1 2 3; do
+            tflint --init && break
+            if [ "$attempt" = 3 ]; then
+              echo "tflint --init failed three times, giving up." >&2
+              exit 1
+            fi
+            echo "tflint --init failed, retrying in $(( attempt * 10 ))s." >&2
+            sleep $(( attempt * 10 ))
+          done
           tflint --format compact --recursive
 
       - name: Scan the configuration
@@ -122,6 +134,7 @@ jobs:
         run: terraform init -input=false
 
       - name: Sign in to Azure
+        id: azure
         uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -138,8 +151,12 @@ jobs:
         shell: bash
         run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
 
+      # Conditioned on the sign in rather than on always(): when Terraform fails
+      # at init the sign in never ran, and an unconditional close then fails
+      # with "Please run 'az login'", adding a second error to a job that only
+      # had one and burying the real cause.
       - name: Close the Key Vault again
-        if: always()
+        if: always() && steps.azure.outcome == 'success'
         run: scripts/keyvault-firewall.sh remove
 
       # Skipped on a manual run: there is no pull request to comment on, and
@@ -184,6 +201,7 @@ jobs:
         run: terraform init -input=false
 
       - name: Sign in to Azure
+        id: azure
         uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -193,9 +211,34 @@ jobs:
       - name: Open the Key Vault to this runner
         run: scripts/keyvault-firewall.sh add
 
+      # The step above finds the vault by tag and does nothing when there is
+      # none, which is every from scratch build: the vault does not exist yet.
+      # Terraform would then create it with its firewall closed and fail on the
+      # first secret it writes, having already built everything else. Creating
+      # the vault on its own first gives the firewall something to open.
+      #
+      # Only on a cold start. Once the vault exists this is a no-op, and the
+      # apply below is the single apply it has always been.
+      - name: Create the Key Vault first on an empty environment
+        run: |
+          if [ -z "$(az keyvault list --resource-group "${RESOURCE_GROUP}" \
+                --query "[?tags.project=='${PROJECT}'].name | [0]" -o tsv)" ]; then
+            echo "No vault yet, creating it before the rest."
+            terraform apply -target=azurerm_key_vault.main \
+              -input=false -auto-approve -lock-timeout=120s
+            scripts/keyvault-firewall.sh add
+          fi
+        env:
+          RESOURCE_GROUP: mpetitRG
+          PROJECT: simplon-quiz
+
       - name: Apply
         run: terraform apply -input=false -auto-approve -lock-timeout=120s
 
+      # Conditioned on the sign in rather than on always(): when Terraform fails
+      # at init the sign in never ran, and an unconditional close then fails
+      # with "Please run 'az login'", adding a second error to a job that only
+      # had one and burying the real cause.
       - name: Close the Key Vault again
-        if: always()
+        if: always() && steps.azure.outcome == 'success'
         run: scripts/keyvault-firewall.sh remove

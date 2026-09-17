@@ -21,6 +21,12 @@ env:
   ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  # The state lives on HCP Terraform, which authenticates with a token and not
+  # with the OIDC trust everything else here uses. It is the only long lived
+  # credential in this project, and ADR 0013 records why it is worth its cost.
+  # The lint job does not need it: `terraform init -backend=false` skips the
+  # cloud block entirely, which was verified rather than assumed.
+  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
 
 jobs:
   destroy:

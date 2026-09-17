@@ -76,15 +76,20 @@ database with it.
 
 ## Bootstrap
 
-Two things cannot be created by the Terraform that consumes them.
-[`scripts/bootstrap-oidc.sh`](scripts/bootstrap-oidc.sh) creates them once:
+One thing cannot be created by the Terraform that consumes it, and
+[`scripts/bootstrap-oidc.sh`](scripts/bootstrap-oidc.sh) creates it once: the app registration
+GitHub authenticates as, with one federated credential per repository and per context, plus the
+role assignments that go with it. Run it with `make bootstrap`.
 
-- the storage account holding the remote state, reached with an Entra ID identity rather than a key
-- the app registration GitHub authenticates as, with one federated credential per repository and
-  per context, plus the role assignments that go with it
+Every path to Azure goes through OIDC. Each workflow proves which repository, branch and
+environment it runs from, and Azure returns a token that expires with the job, so no Azure
+credential is stored anywhere.
 
-No client secret exists anywhere. Each workflow proves which repository, branch and environment it
-runs from, and Azure returns a token that expires with the job.
+There is exactly one long lived secret, and it is not an Azure one. The state lives on HCP
+Terraform, which authenticates with a token: `TF_API_TOKEN` as a repository secret, and a local
+`terraform login` for a plan read from a workstation.
+[ADR 0013](docs/adr/0013-state-on-terraform-cloud.md) records what that costs and why it is worth
+paying here.
 
 ## Decisions
 

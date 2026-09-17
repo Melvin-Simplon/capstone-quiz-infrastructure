@@ -21,3 +21,4 @@ reasoning that produced them.
 | [0010](0010-tag-based-discovery.md) | Pipelines find their targets by tag, never by name | Accepted |
 | [0011](0011-linked-backend-not-taken.md) | The better answer to 0003, and why it was not applied | Accepted |
 | [0012](0012-the-environment-must-be-reproducible.md) | Nothing is protected from destruction, so the rebuild can be proven | Accepted |
+| [0013](0013-state-on-terraform-cloud.md) | The state moves to Terraform Cloud, and buys the first long lived secret | Accepted |

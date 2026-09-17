@@ -11,18 +11,22 @@
 
 set -euo pipefail
 
-APP_NAME="github-oidc-simplon-quiz-bilan"
-OWNER="WhiteMuush"
+# Read from the environment so the Makefile passes its own configuration in,
+# with the current values as defaults. These were hardcoded to the names the
+# repositories carried before they were transferred to the organisation and
+# renamed, which meant re-running this script recreated federated credentials
+# naming repositories that no longer exist.
+APP_NAME="${OIDC_APP_NAME:-github-oidc-simplon-quiz-bilan}"
+OWNER="${ORG:-Melvin-Simplon}"
 
 # One identity for the three repositories rather than three: the trust is carried
 # by the federated credentials below, one per repository and per context, so a
 # shared app registration grants nothing a separate one would have withheld.
-INFRA_REPO="simplon-quiz-infrastructure-bilan"
-BACKEND_REPO="simplon-quiz-backend-bilan"
-FRONTEND_REPO="simplon-quiz-frontend-bilan"
-SUBSCRIPTION_ID="5e683e0f-b00c-48d6-9769-5aaf598de8f1"
-RESOURCE_GROUP="mpetitRG"
-STATE_ACCOUNT="sttfstatempetit"
+INFRA_REPO="${INFRA_REPO:-capstone-quiz-infrastructure}"
+BACKEND_REPO="${BACKEND_REPO:-capstone-quiz-backend}"
+FRONTEND_REPO="${FRONTEND_REPO:-capstone-quiz-frontend}"
+SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-5e683e0f-b00c-48d6-9769-5aaf598de8f1}"
+RESOURCE_GROUP="${RESOURCE_GROUP:-mpetitRG}"
 
 echo "==> Application registration"
 APP_ID=$(az ad app list --display-name "$APP_NAME" --query "[0].appId" -o tsv)
@@ -103,15 +107,11 @@ assign() {
 assign "Contributor" "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}"
 
 # Terraform hands the backend's managed identity its roles on Key Vault and on
-# the storage container, and grants itself the one that lets it write secrets.
+# the storage account it creates, and grants itself the one that lets it write
+# secrets.
 # Creating a role assignment is not something Contributor may do, hence this.
 assign "Role Based Access Control Administrator" \
   "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}"
-
-# The state account has shared key access disabled, so reaching the state needs
-# a data plane role. Control plane rights alone would not open the blob.
-assign "Storage Blob Data Contributor" \
-  "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.Storage/storageAccounts/${STATE_ACCOUNT}"
 
 echo "==> GitHub repository variables"
 # Variables and not secrets: none of these three values is confidential, and
@@ -132,6 +132,21 @@ for repo in "$BACKEND_REPO" "$FRONTEND_REPO"; do
   gh api -X PUT "repos/${OWNER}/${repo}/environments/nonprod" >/dev/null
   echo "    ${repo} has a nonprod environment"
 done
+
+echo "==> Terraform Cloud"
+# The state moved to HCP Terraform (ADR 0013), which authenticates with a
+# long lived token rather than with the federated credentials above. This
+# script deliberately does not place that token itself: the one secret in a
+# project that otherwise has none should be put there by a person who knows
+# they are doing it, not as a side effect of a bootstrap.
+if gh secret list --repo "${OWNER}/${INFRA_REPO}" 2>/dev/null | grep -q '^TF_API_TOKEN'; then
+  echo "    TF_API_TOKEN is already set on ${INFRA_REPO}"
+else
+  echo "    TF_API_TOKEN is missing on ${INFRA_REPO}." >&2
+  echo "    Terraform will not reach its state without it. Run 'terraform login'," >&2
+  echo "    then put the token from ~/.terraform.d/credentials.tfrc.json into" >&2
+  echo "    the repository secret TF_API_TOKEN." >&2
+fi
 
 echo
 echo "Done. Client id: $APP_ID"

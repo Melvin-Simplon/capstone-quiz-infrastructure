@@ -136,14 +136,11 @@ once.
 ```
 Makefile                        entry point: configuration, includes, nothing else
 makefiles/
-  help.mk                       the default target, built from the target comments
-  doctor.mk                     doctor
-  bootstrap.mk                  bootstrap
-  infra.mk                      plan, infra, destroy
-  backend.mk                    backend
-  frontend.mk                   frontend
-  deploy.mk                     deploy, one-shot
-  status.mk                     status, logs
+  common.mk                     help, doctor, bootstrap, status, logs, deploy, one-shot
+  component.mk                  the generic pattern every component is built from
+  infra.mk                      the infrastructure component, plus plan and destroy
+  backend.mk                    the backend component
+  frontend.mk                   the frontend component
 scripts/
   bootstrap-oidc.sh             existing, corrected for the new repository names
   keyvault-firewall.sh          existing, called by the workflows and not from here
@@ -167,10 +164,23 @@ workspace, and it includes the fragments. It declares no target of its own beyon
 setting `help` as the default goal, so that a bare `make` lists what exists rather
 than deploying anything.
 
-`dispatch.sh` is the single place that knows how to trigger a workflow and follow
-its run. `infra`, `backend` and `frontend` all call it with different arguments
-rather than each repeating the `gh workflow run` and `gh run watch` pair. When the
-way a run is followed has to change, it changes once.
+The three components are separated because they are deployed separately and fail
+separately, but they are not written three times. `component.mk` holds one
+`define` block generating the targets a component needs, and `infra.mk`,
+`backend.mk` and `frontend.mk` each instantiate it with their own values: the
+repository, the workflow file, the inputs to dispatch, the human name used in
+messages. A component fragment is a handful of variable assignments and one
+`$(eval $(call ...))`, and adding a fourth component later is the same handful.
+
+Only what is genuinely specific stays in a fragment. `infra.mk` adds `plan` and
+`destroy`, which no other component has. Nothing else needs a target of its own.
+
+`dispatch.sh` is the matching single place on the script side: it knows how to
+trigger a workflow and follow its run, and the generated targets all call it with
+different arguments rather than repeating the `gh workflow run` and `gh run watch`
+pair. The pattern generates the targets, one script executes them, so the way a
+run is followed changes in one file and the shape of a component changes in
+another.
 
 All recipes run under `bash` with `set -euo pipefail`, set once in the root
 `Makefile` through `SHELL` and `.SHELLFLAGS` rather than repeated per recipe.

@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 # Puts the plan on the pull request, and on the run summary.
 #
-# Only on a pull request: a manual run has no pull request to comment on. The
-# plan is in the job log either way.
-#
-# A comment is capped at 65536 characters by the API, so a long plan is cut
-# short rather than losing the comment altogether.
+# A comment is capped by the API, so a long plan is cut short rather than lost.
 
 set -euo pipefail
 

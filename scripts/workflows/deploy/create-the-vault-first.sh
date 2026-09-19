@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 # Creates the Key Vault on its own before the rest, on a cold start only.
 #
-# keyvault-firewall.sh finds the vault by tag and does nothing when there is
-# none, which is every from scratch build: the vault does not exist yet.
-# Terraform would then create it with its firewall closed and fail on the first
-# secret it writes, having already built everything else. Creating the vault
-# first gives the firewall something to open.
-#
-# Once the vault exists this reports ok and changes nothing, and the apply that
-# follows is the single apply it has always been.
+# Terraform would otherwise create it with its firewall closed and fail on the
+# first secret it writes, having already built everything else. A no-op once
+# the vault exists.
 
 set -euo pipefail
 

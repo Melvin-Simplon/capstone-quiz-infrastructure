@@ -46,9 +46,45 @@ what should replace it is [ADR 0011](docs/adr/0011-linked-backend-not-taken.md).
 | `dns.tf` | the four private DNS zones and their virtual network links |
 | `postgres.tf`, `redis.tf`, `storage.tf`, `keyvault.tf` | data services and their private endpoints |
 | `app-service.tf`, `static-web-app.tf` | the plan, the backend, the site |
-| `scripts/` | the two things that live outside Terraform, and why |
+| `.github/workflows/` | one file per category, see [The pipeline](#the-pipeline) |
+| `scripts/workflows/` | what the pipeline runs, one script per step with logic |
+| `scripts/pipeline/` | what the Makefile runs from a workstation |
+| `scripts/bootstrap-oidc.sh` | the one thing Terraform cannot create for itself |
 | `docs/adr/` | one file per decision worth defending |
+| `docs/design/` | designs written before the code, kept for the reasoning |
 | `docs/deployment-pipelines.md` | how the two applications reach this infrastructure |
+
+## The pipeline
+
+Each workflow file is named after a **category**, each job after the **tool**, so a check reads
+`category / tool`. The same shape as the two application repositories, and the same
+`scripts/workflows/lib.sh`, byte for byte, so a job log reads the same in all three.
+
+| File | Name | Check | Runs on |
+| --- | --- | --- | --- |
+| `terraform.yml` | terraform | none, it only calls the others | pull request, push to `main`, manual |
+| `ci-lint.yml` | Lint | `lint / Terraform`, `lint / tflint` | every call |
+| `ci-secrets.yml` | Secrets | `secrets / gitleaks and Trivy` | every call |
+| `ci-iac.yml` | IaC | `iac / Trivy` | every call |
+| `cd-plan.yml` | Plan | `plan / Terraform` | pull request, or a manual run asking for `plan` |
+| `cd-apply.yml` | Apply | `apply / Terraform` | push to `main`, or a manual run asking for `apply` |
+| `terraform-destroy.yml` | terraform destroy | none | manual only, and only after typing the resource group name |
+
+`iac` is this repository's equivalent of the `sast` category elsewhere: it reads the configuration
+as infrastructure, not the code that runs on it.
+
+`ci-lint.yml` is the one called workflow handed no secret at all. Both of its jobs run
+`terraform init -backend=false`, which skips the cloud block, so neither needs the HCP Terraform
+token nor an Azure credential.
+
+`plan`, `apply` and `destroy` share one concurrency group, `terraform-state-nonprod`, because the
+state is a single blob and two runs would fight over its lease. One consequence is worth knowing: a
+run waiting on the `nonprod` approval holds that group while it waits, and `timeout-minutes` does
+not help, because a job that has not started has no clock running. A plan queued behind an
+unapproved apply or destroy stays queued until that one is approved or cancelled.
+
+The workflow **file name** is a public interface. `make infra` and `make doctor` both dispatch
+`terraform.yml` by name, which is why the entry point kept it through this split.
 
 ## Running it
 
@@ -57,9 +93,9 @@ steps, because Terraform reads the vault's secrets over the data plane and the v
 filters it:
 
 ```sh
-scripts/keyvault-firewall.sh add
+scripts/workflows/deploy/keyvault-firewall.sh add
 terraform plan
-scripts/keyvault-firewall.sh remove
+scripts/workflows/deploy/keyvault-firewall.sh remove
 ```
 
 Reading a plan locally also needs the `Key Vault Secrets Officer` role on the vault. The pipeline's

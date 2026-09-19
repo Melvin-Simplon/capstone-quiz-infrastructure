@@ -1,16 +1,15 @@
-name: terraform destroy
+# Builds the environment. The only workflow in this repository that creates
+# anything, and the reason nonprod carries an approval.
+#
+# Called from terraform.yml. It carries no trigger and no condition of its own:
+# what decides whether an apply happens lives there.
+name: Apply
 
-# Deliberately its own file. Kept out of terraform.yml so that no push, no pull
-# request and no future edit to a trigger there can ever reach a destroy: the
-# only way in is someone opening this workflow and typing the resource group
-# name by hand.
 on:
-  workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type the resource group name to confirm the destruction'
+  workflow_call:
+    secrets:
+      TF_API_TOKEN:
         required: true
-        type: string
 
 permissions:
   contents: read
@@ -24,17 +23,16 @@ env:
   # The state lives on HCP Terraform, which authenticates with a token and not
   # with the OIDC trust everything else here uses. It is the only long lived
   # credential in this project, and ADR 0013 records why it is worth its cost.
-  # The lint job does not need it: `terraform init -backend=false` skips the
-  # cloud block entirely, which was verified rather than assumed.
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
 
 jobs:
-  destroy:
+  apply:
+    name: Terraform
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: nonprod
-    # Same group as plan and apply: the state is one blob, and a destroy racing
-    # a plan would fight over the same lease.
+    # Same group as the plan and the destroy: the state is one blob, and two
+    # runs fight over its lease.
     concurrency:
       group: terraform-state-nonprod
       cancel-in-progress: false
@@ -42,16 +40,6 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Check the confirmation
-        env:
-          CONFIRM: ${{ inputs.confirm }}
-          EXPECTED: mpetitRG
-        run: |
-          if [ "$CONFIRM" != "$EXPECTED" ]; then
-            echo "Expected the resource group name, got '$CONFIRM'. Nothing was touched." >&2
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
@@ -72,18 +60,14 @@ jobs:
       - name: Open the Key Vault to this runner
         run: scripts/workflows/deploy/keyvault-firewall.sh add
 
-      # Printed before anything is removed, so the job log carries a record of
-      # what the run was about to take away.
-      - name: Plan the destruction
-        run: terraform plan -destroy -input=false -no-color -lock-timeout=120s
+      - name: Create the Key Vault first on an empty environment
+        env:
+          RESOURCE_GROUP: mpetitRG
+          PROJECT: simplon-quiz
+        run: scripts/workflows/deploy/create-the-vault-first.sh
 
-      # Runs to completion. ADR 0012 removed the seven prevent_destroy blocks,
-      # so nothing stops this: the database, the storage account and the vault
-      # go with the rest. What is left against an accident is the plan printed
-      # above, the resource group name typed into the dispatch form, and the
-      # approval on the nonprod environment.
-      - name: Destroy
-        run: terraform destroy -input=false -auto-approve -lock-timeout=120s
+      - name: Apply
+        run: terraform apply -input=false -auto-approve -lock-timeout=120s
 
       # Conditioned on the sign in rather than on always(): when Terraform fails
       # at init the sign in never ran, and an unconditional close then fails

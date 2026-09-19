@@ -55,9 +55,12 @@ jobs:
       TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
     uses: ./.github/workflows/cd-plan.yml
 
+  # Never on a push: the environment is destroyed between sessions, so main
+  # usually describes something that deliberately does not exist. make infra
+  # dispatches this with action=apply.
   apply:
     needs: [lint, secrets, iac]
-    if: github.event_name == 'push' || inputs.action == 'apply'
+    if: inputs.action == 'apply'
     permissions:
       contents: read
       id-token: write

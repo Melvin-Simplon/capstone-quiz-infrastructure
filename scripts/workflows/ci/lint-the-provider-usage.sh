@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# tflint, which reads what the configuration asks of the provider rather than
-# whether it parses.
+# tflint, which reads what the configuration asks of the provider.
 #
-# tflint --init pulls its ruleset through the GitHub API. Unauthenticated it
-# gets sixty requests an hour, counted per address and shared with every other
-# runner behind it, so the quota is routinely gone before this job starts and it
-# answers 403. GITHUB_TOKEN raises that to a thousand an hour for this
-# repository, which is the actual fix: the retry below cannot help against a
-# quota that is already spent. It is kept for the genuine 500s, which happen too.
+# GITHUB_TOKEN is the real fix for the 403s: tflint --init pulls its rulesets
+# through the API, and sixty unauthenticated requests an hour are shared with
+# every other runner. The retry below is for the genuine 500s.
 
 set -euo pipefail
 

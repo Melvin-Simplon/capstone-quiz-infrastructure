@@ -16,7 +16,7 @@ the ones that cannot create themselves, and they are listed under [Bootstrap](#b
 | Application | <https://kind-ocean-089457b03.7.azurestaticapps.net> |
 | Backend health | <https://app-simplon-quiz-mpetit.azurewebsites.net/actuator/health> |
 | Resource group | `mpetitRG`, France Central |
-| Pipeline | plan on every pull request, apply on merge into `main` |
+| Pipeline | plan on every pull request, apply only when asked for |
 
 ---
 
@@ -67,7 +67,7 @@ Each workflow file is named after a **category**, each job after the **tool**, s
 | `ci-secrets.yml` | Secrets | `secrets / gitleaks and Trivy` | every call |
 | `ci-iac.yml` | IaC | `iac / Trivy` | every call |
 | `cd-plan.yml` | Plan | `plan / Terraform` | pull request, or a manual run asking for `plan` |
-| `cd-apply.yml` | Apply | `apply / Terraform` | push to `main`, or a manual run asking for `apply` |
+| `cd-apply.yml` | Apply | `apply / Terraform` | a manual run asking for `apply`, and nothing else |
 | `terraform-destroy.yml` | terraform destroy | none | manual only, and only after typing the resource group name |
 
 `iac` is this repository's equivalent of the `sast` category elsewhere: it reads the configuration
@@ -76,6 +76,13 @@ as infrastructure, not the code that runs on it.
 `ci-lint.yml` is the one called workflow handed no secret at all. Both of its jobs run
 `terraform init -backend=false`, which skips the cloud block, so neither needs the HCP Terraform
 token nor an Azure credential.
+
+Applying is never a side effect of a merge. A push to `main` runs the three checking categories and
+stops there. An apply on every push would assume `main` should always be applied and that an
+environment not matching it is drift to correct, and that is not this project: the environment is
+destroyed between sessions on purpose, so most of the time `main` describes something that
+deliberately does not exist. Building is `make infra`, which dispatches this workflow with
+`action=apply`, and the plan still runs on every pull request, so nothing is seen less than before.
 
 `plan`, `apply` and `destroy` share one concurrency group, `terraform-state-nonprod`, because the
 state is a single blob and two runs would fight over its lease. One consequence is worth knowing: a

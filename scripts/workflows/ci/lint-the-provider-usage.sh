@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# tflint, which reads what the configuration asks of the provider rather than
+# whether it parses.
+#
+# tflint --init pulls its ruleset through the GitHub API. Unauthenticated it
+# gets sixty requests an hour, counted per address and shared with every other
+# runner behind it, so the quota is routinely gone before this job starts and it
+# answers 403. GITHUB_TOKEN raises that to a thousand an hour for this
+# repository, which is the actual fix: the retry below cannot help against a
+# quota that is already spent. It is kept for the genuine 500s, which happen too.
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/workflows/lib.sh
+source "${HERE}/lib.sh"
+
+readonly RECAP_NAME="tflint"
+readonly ATTEMPTS=3
+
+install_rulesets() {
+    task "tflint : install the rulesets"
+    local attempt
+    for attempt in $(seq 1 "$ATTEMPTS"); do
+        if tflint --init >&2; then
+            report_ok "rulesets" "installed"
+            return 0
+        fi
+        if [[ "$attempt" -eq "$ATTEMPTS" ]]; then
+            report_unreachable "api.github.com" "tflint --init failed ${ATTEMPTS} times"
+            hint "an unauthenticated runner shares a sixty per hour quota; check GITHUB_TOKEN reached this step"
+            return 1
+        fi
+        printf 'tflint --init failed, retrying in %ss.\n' "$(( attempt * 10 ))" >&2
+        sleep "$(( attempt * 10 ))"
+    done
+}
+
+lint() {
+    task "tflint : lint the provider usage"
+    if tflint --format compact --recursive >&2; then
+        report_ok "configuration" "no finding"
+        return 0
+    fi
+    report_failed "configuration" "tflint found something, see the lines above"
+    return 1
+}
+
+main() {
+    local status=0
+    install_rulesets || status=1
+    [[ "$status" -eq 0 ]] && { lint || true; }
+    recap "$RECAP_NAME"
+}
+
+main "$@"

@@ -27,7 +27,7 @@ along with the `Storage Blob Data Contributor` assignment the bootstrap made for
 
 **The workspace runs in local execution mode.** This is not the default and the reason is specific:
 in remote execution Terraform runs on HashiCorp infrastructure, at an address nothing here can
-predict, while [`scripts/keyvault-firewall.sh`](../../scripts/keyvault-firewall.sh) opens the vault
+predict, while [`scripts/workflows/deploy/keyvault-firewall.sh`](../../scripts/workflows/deploy/keyvault-firewall.sh) opens the vault
 for the address of the machine running the command. A remote run would open the door for the runner
 and then read the vault from somewhere else, and every plan touching a secret would fail. In local
 execution mode Terraform still runs on the GitHub runner, and HCP Terraform holds nothing but the

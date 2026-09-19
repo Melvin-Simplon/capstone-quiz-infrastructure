@@ -66,7 +66,7 @@ Each workflow file is named after a **category**, each job after the **tool**, s
 | `ci-lint.yml` | Lint | `lint / Terraform`, `lint / tflint` | every call |
 | `ci-secrets.yml` | Secrets | `secrets / gitleaks and Trivy` | every call |
 | `ci-iac.yml` | IaC | `iac / Trivy` | every call |
-| `cd-plan.yml` | Plan | `plan / Terraform` | pull request, or a manual run asking for `plan` |
+| `cd-plan.yml` | Plan | `plan / Terraform` | pull request, or a manual run asking for `plan`, never for Dependabot |
 | `cd-apply.yml` | Apply | `apply / Terraform` | a manual run asking for `apply`, and nothing else |
 | `terraform-destroy.yml` | terraform destroy | none | manual only, and only after typing the resource group name |
 
@@ -76,6 +76,11 @@ as infrastructure, not the code that runs on it.
 `ci-lint.yml` is the one called workflow handed no secret at all. Both of its jobs run
 `terraform init -backend=false`, which skips the cloud block, so neither needs the HCP Terraform
 token nor an Azure credential.
+
+The plan is skipped on Dependabot runs. GitHub hands those a separate, empty secret store, so
+`TF_API_TOKEN` arrives blank and `terraform init` stops on "Required token could not be found",
+failing a required check on a branch that only bumps a provider. `lint / Terraform` still installs
+the bumped provider and validates against it, so the bump is not merged unverified.
 
 Applying is never a side effect of a merge. A push to `main` runs the three checking categories and
 stops there. An apply on every push would assume `main` should always be applied and that an

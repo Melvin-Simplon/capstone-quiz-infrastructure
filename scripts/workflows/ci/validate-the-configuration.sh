@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # Formatting and validity of the Terraform configuration.
 #
-# init -backend=false on purpose: it skips the cloud block entirely, so this
-# needs no HCP Terraform token and no Azure credential. That was verified rather
-# than assumed, and it is why ci-lint.yml is the one called workflow that is
-# handed no secret.
+# init -backend=false skips the cloud block, so this needs no HCP Terraform
+# token and no Azure credential.
 
 set -euo pipefail
 

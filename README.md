@@ -100,9 +100,19 @@ The workflow **file name** is a public interface. `make infra` and `make doctor`
 
 ## Running it
 
-Deployments go through the `terraform` workflow. A local run is for reading a plan, and takes two
-steps, because Terraform reads the vault's secrets over the data plane and the vault's firewall
-filters it:
+The Makefile is the way in. Nothing in it touches Azure directly: each target dispatches a workflow
+in one of the three repositories and follows its run, so a deployment started from a workstation
+leaves the same trace as one started from GitHub. `make help` lists the targets:
+
+![Output of make help: the targets grouped as Setup, Deploy, Inspect, Teardown and Help, each with
+a one line description, under a warning that destroy tears down the whole environment and nothing is
+protected any more](img/make-help.png)
+
+`make one-shot` is the one to know for an empty environment: it builds the infrastructure, then
+deploys the backend and the frontend in that order, and it is resumable after a failure.
+
+A local run is for reading a plan, and takes two steps, because Terraform reads the vault's secrets
+over the data plane and the vault's firewall filters it:
 
 ```sh
 scripts/workflows/deploy/keyvault-firewall.sh add

@@ -40,14 +40,9 @@ jobs:
   iac:
     uses: ./.github/workflows/ci-iac.yml
 
-  # Skipped for Dependabot: those runs get a separate, empty secret store, so
-  # TF_API_TOKEN arrives blank and init stops on "Required token could not be
-  # found". lint still installs the bumped provider and validates against it.
   plan:
     needs: [lint, secrets, iac]
-    if: >-
-      github.actor != 'dependabot[bot]' &&
-      (github.event_name == 'pull_request' || inputs.action == 'plan')
+    if: github.event_name == 'pull_request' || inputs.action == 'plan'
     # A called workflow cannot hold more than its caller grants it. The plan
     # posts itself on the pull request, hence pull-requests: write.
     permissions:

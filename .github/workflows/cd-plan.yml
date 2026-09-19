@@ -27,6 +27,12 @@ env:
 jobs:
   plan:
     name: Terraform
+    # Skipped for Dependabot: those runs get a separate, empty secret store, so
+    # TF_API_TOKEN arrives blank and init stops on "Required token could not be
+    # found". The condition belongs here and not on the calling job: skipping
+    # the caller never starts this workflow, so the plan / Terraform check is
+    # never reported at all and a ruleset requiring it waits for ever.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The state lives in a single blob, so a run on one branch races a run on

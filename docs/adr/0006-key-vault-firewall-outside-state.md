@@ -16,7 +16,7 @@ earn the right to read the secrets.
 ## Decision
 
 `ip_rules` stays empty in the configuration, with `ignore_changes` on it.
-`scripts/keyvault-firewall.sh` opens the vault to the caller's address before a run and closes it
+`scripts/workflows/deploy/keyvault-firewall.sh` opens the vault to the caller's address before a run and closes it
 after, in the pipeline and by hand alike. The vault is found by tag, not by name.
 
 ## Consequences

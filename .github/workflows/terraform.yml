@@ -1,3 +1,9 @@
+# The entry point. Holds no steps of its own: it calls one workflow per
+# category, then the plan or the apply depending on what the event means.
+#
+# The file name is a public interface. The Makefile in this repository and
+# doctor.sh both dispatch terraform.yml by name, so renaming it breaks them
+# silently.
 name: terraform
 
 on:
@@ -20,230 +26,41 @@ on:
 permissions:
   contents: read
 
-env:
-  ARM_USE_OIDC: true
-  ARM_USE_AZUREAD: true
-  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-  # The state lives on HCP Terraform, which authenticates with a token and not
-  # with the OIDC trust everything else here uses. It is the only long lived
-  # credential in this project, and ADR 0013 records why it is worth its cost.
-  # The lint job does not need it: `terraform init -backend=false` skips the
-  # cloud block entirely, which was verified rather than assumed.
-  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+    uses: ./.github/workflows/ci-lint.yml
 
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: 1.9.8
+  secrets:
+    uses: ./.github/workflows/ci-secrets.yml
 
-      - name: Check formatting
-        run: terraform fmt -check -recursive
-
-      - name: Validate
-        run: |
-          terraform init -backend=false -input=false
-          terraform validate
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      # Full history, because the secret scan below reads commits rather than
-      # files: something committed and removed the next day is still readable
-      # forever in a public repository, which this one is.
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Scan the history for secrets
-        env:
-          GITLEAKS_VERSION: 8.30.1
-        run: |
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz gitleaks
-          ./gitleaks git . --no-banner --redact
-
-      - uses: terraform-linters/setup-tflint@v6
-        with:
-          tflint_version: v0.64.0
-      - name: Lint the provider usage
-        # tflint --init pulls its ruleset through the GitHub API. Unauthenticated
-        # it gets sixty requests an hour, counted per address and shared with
-        # every other runner behind it, so the quota is routinely gone before
-        # this job starts and it answers 403. The token raises that to a
-        # thousand an hour for this repository, which is the actual fix: the
-        # retry below cannot help against a quota that is already spent.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Kept for the genuine 500s, which happen too.
-          for attempt in 1 2 3; do
-            tflint --init && break
-            if [ "$attempt" = 3 ]; then
-              echo "tflint --init failed three times, giving up." >&2
-              exit 1
-            fi
-            echo "tflint --init failed, retrying in $(( attempt * 10 ))s." >&2
-            sleep $(( attempt * 10 ))
-          done
-          tflint --format compact --recursive
-
-      - name: Scan the configuration
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: config
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-
-      - name: Scan for secrets
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: secret
-          severity: MEDIUM,HIGH,CRITICAL
-          exit-code: "1"
+  iac:
+    uses: ./.github/workflows/ci-iac.yml
 
   plan:
-    needs: [lint, security]
+    needs: [lint, secrets, iac]
     if: github.event_name == 'pull_request' || inputs.action == 'plan'
-    runs-on: ubuntu-latest
-    # The state lives in a single blob, so a run on one branch races a run on
-    # another for its lease. Keying this on the ref, as it was, put every branch
-    # in its own queue and let a pull request plan die on LeaseAlreadyPresent
-    # while an apply held the lock on main. The lock timeout does not save it:
-    # when the lease is taken mid-write the blob carries no terraformlockid and
-    # Terraform gives up instead of waiting.
-    concurrency:
-      group: terraform-state-nonprod
-      cancel-in-progress: false
+    # A called workflow cannot hold more than its caller grants it. The plan
+    # posts itself on the pull request, hence pull-requests: write.
     permissions:
       contents: read
       id-token: write
       pull-requests: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: 1.9.8
-
-      - name: Init
-        run: terraform init -input=false
-
-      - name: Sign in to Azure
-        id: azure
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      # Reading the vault's secrets goes through the data plane, which its
-      # firewall filters. The door is opened for this run and closed right after,
-      # rather than left described in the configuration.
-      - name: Open the Key Vault to this runner
-        run: scripts/keyvault-firewall.sh add
-
-      - name: Plan
-        shell: bash
-        run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
-
-      # Conditioned on the sign in rather than on always(): when Terraform fails
-      # at init the sign in never ran, and an unconditional close then fails
-      # with "Please run 'az login'", adding a second error to a job that only
-      # had one and burying the real cause.
-      - name: Close the Key Vault again
-        if: always() && steps.azure.outcome == 'success'
-        run: scripts/keyvault-firewall.sh remove
-
-      # Skipped on a manual run: there is no pull request to comment on, and
-      # context.issue.number would be empty. The plan is still in the job log.
-      - name: Comment plan on the pull request
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const plan = fs.readFileSync('plan.txt', 'utf8');
-            const maxCommentLength = 60000;
-            const body = plan.length > maxCommentLength
-              ? plan.slice(0, maxCommentLength) + '\n\n... truncated, see the job log for the full plan.'
-              : plan;
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '### Terraform plan\n\n```terraform\n' + body + '\n```',
-            });
+    # secrets: inherit would hand the called workflow every secret this
+    # repository holds. It needs one.
+    secrets:
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+    uses: ./.github/workflows/cd-plan.yml
 
   apply:
-    needs: [lint, security]
+    needs: [lint, secrets, iac]
     if: github.event_name == 'push' || inputs.action == 'apply'
-    runs-on: ubuntu-latest
-    environment: nonprod
-    concurrency:
-      group: terraform-state-nonprod
-      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: 1.9.8
-
-      - name: Init
-        run: terraform init -input=false
-
-      - name: Sign in to Azure
-        id: azure
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Open the Key Vault to this runner
-        run: scripts/keyvault-firewall.sh add
-
-      # The step above finds the vault by tag and does nothing when there is
-      # none, which is every from scratch build: the vault does not exist yet.
-      # Terraform would then create it with its firewall closed and fail on the
-      # first secret it writes, having already built everything else. Creating
-      # the vault on its own first gives the firewall something to open.
-      #
-      # Only on a cold start. Once the vault exists this is a no-op, and the
-      # apply below is the single apply it has always been.
-      - name: Create the Key Vault first on an empty environment
-        run: |
-          if [ -z "$(az keyvault list --resource-group "${RESOURCE_GROUP}" \
-                --query "[?tags.project=='${PROJECT}'].name | [0]" -o tsv)" ]; then
-            echo "No vault yet, creating it before the rest."
-            terraform apply -target=azurerm_key_vault.main \
-              -input=false -auto-approve -lock-timeout=120s
-            scripts/keyvault-firewall.sh add
-          fi
-        env:
-          RESOURCE_GROUP: mpetitRG
-          PROJECT: simplon-quiz
-
-      - name: Apply
-        run: terraform apply -input=false -auto-approve -lock-timeout=120s
-
-      # Conditioned on the sign in rather than on always(): when Terraform fails
-      # at init the sign in never ran, and an unconditional close then fails
-      # with "Please run 'az login'", adding a second error to a job that only
-      # had one and burying the real cause.
-      - name: Close the Key Vault again
-        if: always() && steps.azure.outcome == 'success'
-        run: scripts/keyvault-firewall.sh remove
+    secrets:
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+    uses: ./.github/workflows/cd-apply.yml

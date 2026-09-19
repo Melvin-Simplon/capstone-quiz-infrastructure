@@ -112,7 +112,7 @@ along with the `Storage Blob Data Contributor` assignment it needed.
 
 The workspace runs in **local execution mode**. This is not the default and it
 matters: in remote execution Terraform runs on HashiCorp infrastructure, at an
-address nothing here can predict, while `scripts/keyvault-firewall.sh` opens the
+address nothing here can predict, while `scripts/workflows/deploy/keyvault-firewall.sh` opens the
 vault for the address of the machine running the command. A remote run would open
 the door for the runner and then read the vault from somewhere else, and the plan
 would fail. In local execution mode Terraform still runs on the GitHub runner and

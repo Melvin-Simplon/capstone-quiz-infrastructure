@@ -11,10 +11,12 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/pipeline/lib.sh
 source "${HERE}/lib.sh"
 
+# Each entry names the workflow the matching make target dispatches, so this
+# check fails the day one is renamed rather than the next deployment.
 REPOS=(
     "${ORG}/${INFRA_REPO}:terraform.yml"
     "${ORG}/${BACKEND_REPO}:ci-cd.yml"
-    "${ORG}/${FRONTEND_REPO}:ci-cd.yml"
+    "${ORG}/${FRONTEND_REPO}:cd.yml"
 )
 
 check_github() {

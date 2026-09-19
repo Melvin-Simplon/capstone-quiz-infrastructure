@@ -55,9 +55,24 @@ jobs:
       TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
     uses: ./.github/workflows/cd-plan.yml
 
+  # Only when someone asks for it, never as a side effect of a merge.
+  #
+  # An apply on every push to main assumes main should always be applied, and
+  # that an environment not matching it is drift to correct. That is not this
+  # project: the environment is destroyed between sessions on purpose, so most
+  # of the time main describes something that deliberately does not exist.
+  #
+  # On that footing an automatic apply can only do one of two wrong things.
+  # Build what nobody asked for, or sit waiting for an approval that will be
+  # refused, which leaves main red and holds the terraform-state-nonprod lease
+  # while it waits, queueing every plan behind it.
+  #
+  # Nothing is lost by removing it. make infra dispatches this workflow with
+  # action=apply, so building is still one command, and the plan still runs on
+  # every pull request.
   apply:
     needs: [lint, secrets, iac]
-    if: github.event_name == 'push' || inputs.action == 'apply'
+    if: inputs.action == 'apply'
     permissions:
       contents: read
       id-token: write

@@ -36,10 +36,11 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.9.8
 
@@ -53,6 +54,7 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       # Full history, because the secret scan below reads commits rather than
       # files: something committed and removed the next day is still readable
@@ -65,11 +67,11 @@ jobs:
         env:
           GITLEAKS_VERSION: 8.30.1
         run: |
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+          curl -sSfL --proto '=https' --proto-redir '=https' "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | tar -xz gitleaks
           ./gitleaks git . --no-banner --redact
 
-      - uses: terraform-linters/setup-tflint@v6
+      - uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
         with:
           tflint_version: v0.64.0
       - name: Lint the provider usage
@@ -95,7 +97,7 @@ jobs:
           tflint --format compact --recursive
 
       - name: Scan the configuration
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -103,7 +105,7 @@ jobs:
           exit-code: "1"
 
       - name: Scan for secrets
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -115,6 +117,7 @@ jobs:
     needs: [lint, security]
     if: github.event_name == 'pull_request' || inputs.action == 'plan'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # The state lives in a single blob, so a run on one branch races a run on
     # another for its lease. Keying this on the ref, as it was, put every branch
     # in its own queue and let a pull request plan die on LeaseAlreadyPresent
@@ -131,7 +134,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.9.8
 
@@ -140,7 +143,7 @@ jobs:
 
       - name: Sign in to Azure
         id: azure
-        uses: azure/login@v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -188,6 +191,7 @@ jobs:
     needs: [lint, security]
     if: github.event_name == 'push' || inputs.action == 'apply'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     environment: nonprod
     concurrency:
       group: terraform-state-nonprod
@@ -198,7 +202,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.9.8
 
@@ -207,7 +211,7 @@ jobs:
 
       - name: Sign in to Azure
         id: azure
-        uses: azure/login@v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}

@@ -3,8 +3,16 @@ resource "random_password" "backend_api_key" {
   special = false
 }
 
+# Drawn again on every rebuild, since destroy removes it with the rest. See
+# ADR 0014 for why the vault cannot keep one name across rebuilds.
+resource "random_string" "key_vault" {
+  length  = 4
+  upper   = false
+  special = false
+}
+
 resource "azurerm_key_vault" "main" {
-  name                = "kv-${local.name_suffix}"
+  name                = local.key_vault_name
   resource_group_name = data.azurerm_resource_group.main.name
   location            = data.azurerm_resource_group.main.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
@@ -41,6 +49,11 @@ resource "azurerm_key_vault" "main" {
 
   lifecycle {
     ignore_changes = [network_acls[0].ip_rules]
+
+    precondition {
+      condition     = length(local.key_vault_name) <= 24
+      error_message = "The vault name ${local.key_vault_name} is over 24 characters: shorten var.owner or var.project."
+    }
   }
 }
 

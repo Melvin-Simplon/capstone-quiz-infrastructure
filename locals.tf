@@ -14,6 +14,10 @@ locals {
   # capped at 24 characters, so the dashed suffix cannot be reused as is.
   storage_account_name = replace("st${local.name_suffix}", "-", "")
 
+  # Same 24 character cap, plus a suffix drawn per build: a destroyed vault keeps
+  # its name for the whole soft delete retention, see ADR 0014.
+  key_vault_name = replace("kv${local.name_suffix}${random_string.key_vault.result}", "-", "")
+
   storage_container_name = "java-uploads-${var.owner}"
 
   frontend_origin = "https://${azurerm_static_web_app.frontend.default_host_name}"

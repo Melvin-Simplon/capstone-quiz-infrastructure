@@ -22,7 +22,7 @@ the quiz sessions played against it, which in this environment is test data.
 ## Decision
 
 The seven `prevent_destroy` blocks are removed. `terraform destroy` runs to completion, and
-[the destroy workflow](../../.github/workflows/terraform-destroy.yml) is the way it is reached.
+[the destroy workflow](../../.github/workflows/cd-destroy.yml) is the way it is reached.
 
 ## Consequences
 

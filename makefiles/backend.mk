@@ -1,6 +1,6 @@
 # The backend component.
 
-BACKEND_WORKFLOW ?= ci-cd.yml
+BACKEND_WORKFLOW ?= cd-deploy.yml
 
 ##@ Deploy
 

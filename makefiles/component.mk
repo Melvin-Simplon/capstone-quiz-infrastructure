@@ -5,9 +5,9 @@
 # also the only place `make` knows the shape of that command.
 #
 #   $(1) repository      capstone-quiz-backend
-#   $(2) workflow file   ci-cd.yml
+#   $(2) workflow file   cd-deploy.yml
 #   $(3) label           shown in the messages
-#   $(4) dispatch field  "action=apply", or empty when the workflow takes none
+#   $(4) dispatch field  "key=value", or empty when the workflow takes none
 
 dispatch = $(PIPELINE)/dispatch.sh \
     --repo "$(ORG)/$(1)" \

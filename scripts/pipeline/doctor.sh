@@ -14,9 +14,9 @@ source "${HERE}/lib.sh"
 # Each entry names the workflow the matching make target dispatches, so this
 # check fails the day one is renamed rather than the next deployment.
 REPOS=(
-    "${ORG}/${INFRA_REPO}:terraform.yml"
-    "${ORG}/${BACKEND_REPO}:ci-cd.yml"
-    "${ORG}/${FRONTEND_REPO}:cd.yml"
+    "${ORG}/${INFRA_REPO}:cd-apply.yml"
+    "${ORG}/${BACKEND_REPO}:cd-deploy.yml"
+    "${ORG}/${FRONTEND_REPO}:cd-deploy.yml"
 )
 
 check_github() {

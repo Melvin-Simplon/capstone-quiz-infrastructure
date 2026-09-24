@@ -1,6 +1,7 @@
 # Simplon Quiz Infrastructure
 
-[![terraform](https://github.com/WhiteMuush/simplon-quiz-infrastructure-bilan/actions/workflows/terraform.yml/badge.svg?branch=main)](https://github.com/WhiteMuush/simplon-quiz-infrastructure-bilan/actions/workflows/terraform.yml)
+[![CI - Build module](https://github.com/Melvin-Simplon/capstone-quiz-infrastructure/actions/workflows/ci-build.yml/badge.svg?branch=main)](https://github.com/Melvin-Simplon/capstone-quiz-infrastructure/actions/workflows/ci-build.yml)
+[![CI - Security scan](https://github.com/Melvin-Simplon/capstone-quiz-infrastructure/actions/workflows/ci-security.yml/badge.svg?branch=main)](https://github.com/Melvin-Simplon/capstone-quiz-infrastructure/actions/workflows/ci-security.yml)
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.9-7B42BC?logo=terraform&logoColor=white)](versions.tf)
 [![azurerm](https://img.shields.io/badge/azurerm-~%3E4.0-0078D4?logo=microsoftazure&logoColor=white)](versions.tf)
 [![Region](https://img.shields.io/badge/region-France%20Central-0078D4)](#what-is-deployed)
@@ -56,38 +57,36 @@ what should replace it is [ADR 0011](docs/adr/0011-linked-backend-not-taken.md).
 
 ## The pipeline
 
-Each workflow file is named after a **category**, each job after the **tool**, so a check reads
-`category / tool`. The same shape as the two application repositories, and the same
-`scripts/workflows/lib.sh`, byte for byte, so a job log reads the same in all three.
+Four workflow files, one per kind of work, the same split as the two application repositories.
+Each job is named after its category and its tool, so a check reads `Lint (tflint)` or
+`IaC (Trivy)`. All of them share `scripts/workflows/lib.sh`, byte for byte, so a job log reads the
+same in all three.
 
-| File | Name | Check | Runs on |
+| File | Name | Jobs | Runs on |
 | --- | --- | --- | --- |
-| `terraform.yml` | terraform | none, it only calls the others | pull request, push to `main`, manual |
-| `ci-lint.yml` | Lint | `lint / Terraform`, `lint / tflint` | every call |
-| `ci-secrets.yml` | Secrets | `secrets / gitleaks and Trivy` | every call |
-| `ci-iac.yml` | IaC | `iac / Trivy` | every call |
-| `cd-plan.yml` | Plan | `plan / Terraform` | pull request, or a manual run asking for `plan`, never for Dependabot |
-| `cd-apply.yml` | Apply | `apply / Terraform` | a manual run asking for `apply`, and nothing else |
-| `terraform-destroy.yml` | terraform destroy | none | manual only, and only after typing the resource group name |
+| `ci-build.yml` | CI - Build module | `Lint (Terraform fmt and validate)`, `Lint (tflint)`, `Plan (Terraform)` | pull request, `make plan`, called by `cd-apply.yml` |
+| `ci-security.yml` | CI - Security scan | `Secrets (gitleaks and Trivy)`, `IaC (Trivy)` | pull request, called by `cd-apply.yml` |
+| `cd-apply.yml` | CD - Apply | build and security first, then `Apply (Terraform)` | `make infra` only |
+| `cd-destroy.yml` | CD - Destroy | `destroy` | manual only, and only after typing the resource group name |
 
-`iac` is this repository's equivalent of the `sast` category elsewhere: it reads the configuration
-as infrastructure, not the code that runs on it.
+`IaC (Trivy)` is this repository's equivalent of the SAST category elsewhere: it reads the
+configuration as infrastructure, not the code that runs on it.
 
-`ci-lint.yml` is the one called workflow handed no secret at all. Both of its jobs run
-`terraform init -backend=false`, which skips the cloud block, so neither needs the HCP Terraform
-token nor an Azure credential.
+The two lint jobs are handed no secret at all. Both run `terraform init -backend=false`, which
+skips the cloud block, so neither needs the HCP Terraform token nor an Azure credential.
 
 The plan is skipped on Dependabot runs. GitHub hands those a separate, empty secret store, so
 `TF_API_TOKEN` arrives blank and `terraform init` stops on "Required token could not be found",
-failing a required check on a branch that only bumps a provider. `lint / Terraform` still installs
-the bumped provider and validates against it, so the bump is not merged unverified.
+failing a required check on a branch that only bumps a provider. `Lint (Terraform fmt and validate)`
+still installs the bumped provider and validates against it, so the bump is not merged unverified.
 
-Applying is never a side effect of a merge. A push to `main` runs the three checking categories and
-stops there. An apply on every push would assume `main` should always be applied and that an
-environment not matching it is drift to correct, and that is not this project: the environment is
-destroyed between sessions on purpose, so most of the time `main` describes something that
-deliberately does not exist. Building is `make infra`, which dispatches this workflow with
-`action=apply`, and the plan still runs on every pull request, so nothing is seen less than before.
+Applying is never a side effect of a merge, and a push to `main` runs nothing at all: every check
+already passed on the pull request. An apply on every push would assume `main` should always be
+applied and that an environment not matching it is drift to correct, and that is not this project:
+the environment is destroyed between sessions on purpose, so most of the time `main` describes
+something that deliberately does not exist. Building is `make infra`, which dispatches
+`cd-apply.yml`. It runs the lint and security jobs first, and leaves the plan out: the pull request
+already showed it.
 
 `plan`, `apply` and `destroy` share one concurrency group, `terraform-state-nonprod`, because the
 state is a single blob and two runs would fight over its lease. One consequence is worth knowing: a
@@ -95,8 +94,9 @@ run waiting on the `nonprod` approval holds that group while it waits, and `time
 not help, because a job that has not started has no clock running. A plan queued behind an
 unapproved apply or destroy stays queued until that one is approved or cancelled.
 
-The workflow **file name** is a public interface. `make infra` and `make doctor` both dispatch
-`terraform.yml` by name, which is why the entry point kept it through this split.
+The workflow **file names** are a public interface. `make` dispatches `cd-apply.yml`,
+`ci-build.yml` and `cd-destroy.yml` here, and `cd-deploy.yml` in the two application repositories,
+by name, and `make doctor` checks that each one exists.
 
 ## Running it
 
@@ -129,7 +129,7 @@ Nothing is protected from deletion. [ADR 0012](docs/adr/0012-the-environment-mus
 removed the `prevent_destroy` blocks that [ADR 0008](docs/adr/0008-prevent-destroy-on-stateful-resources.md)
 had put on the seven resources holding state, so that this environment can actually be rebuilt from
 this repository rather than only claiming it can. Tearing it down is the
-[destroy workflow](.github/workflows/terraform-destroy.yml), or `make destroy`, and it takes the
+[destroy workflow](.github/workflows/cd-destroy.yml), or `make destroy`, and it takes the
 database with it.
 
 ## Bootstrap

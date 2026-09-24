@@ -1,6 +1,6 @@
-name: terraform destroy
+name: CD - Destroy
 
-# Deliberately its own file. Kept out of terraform.yml so that no push, no pull
+# Deliberately its own file, apart from cd-apply.yml, so that no push, no pull
 # request and no future edit to a trigger there can ever reach a destroy: the
 # only way in is someone opening this workflow and typing the resource group
 # name by hand.

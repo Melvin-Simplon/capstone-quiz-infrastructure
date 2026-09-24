@@ -1,38 +1,72 @@
-# What Terraform intends to change, printed and posted on the pull request.
+# Everything that says whether the configuration holds together and what it
+# would change: formatting, validity, provider usage, then the plan.
 #
-# Called from terraform.yml. It carries no trigger and no condition of its own:
-# what decides whether a plan happens lives there.
-name: Plan
+# Runs on every pull request, where it gates the merge and posts the plan.
+# make plan dispatches it on its own. cd-apply.yml calls it with lint_only
+# before an apply.
+#
+# The lint jobs run `terraform init -backend=false`, which skips the cloud
+# block entirely, so neither needs the HCP Terraform token nor an Azure
+# credential. Only the plan does.
+name: CI - Build module
 
 on:
+  pull_request:
+    branches: [develop, main]
   workflow_call:
+    inputs:
+      lint_only:
+        description: Skip the plan, for a caller about to apply.
+        type: boolean
+        default: false
     secrets:
       TF_API_TOKEN:
         required: true
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  ARM_USE_OIDC: true
-  ARM_USE_AZUREAD: true
-  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-  # The state lives on HCP Terraform, which authenticates with a token and not
-  # with the OIDC trust everything else here uses. It is the only long lived
-  # credential in this project, and ADR 0013 records why it is worth its cost.
-  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
-
 jobs:
+  terraform:
+    name: Lint (Terraform fmt and validate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.9.8
+
+      - name: Check the formatting and the validity
+        run: scripts/workflows/ci/validate-the-configuration.sh
+
+  tflint:
+    name: Lint (tflint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
+        with:
+          tflint_version: v0.64.0
+
+      - name: Lint the provider usage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/workflows/ci/lint-the-provider-usage.sh
+
   plan:
-    name: Terraform
+    name: Plan (Terraform)
+    needs: [terraform, tflint]
     # Skipped for Dependabot: those runs get a separate, empty secret store, so
     # TF_API_TOKEN arrives blank and init stops on "Required token could not be
-    # found". The condition belongs here and not on the calling job: skipping
-    # the caller never starts this workflow, so the plan / Terraform check is
-    # never reported at all and a ruleset requiring it waits for ever.
-    if: github.actor != 'dependabot[bot]'
+    # found". A job skipped by its own condition still reports its check, so a
+    # ruleset requiring it does not wait. cd-apply.yml skips it too: it applies
+    # right after, and the pull request already showed the plan.
+    if: ${{ !inputs.lint_only && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The state lives in a single blob, so a run on one branch races a run on
@@ -54,6 +88,16 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
+    env:
+      ARM_USE_OIDC: true
+      ARM_USE_AZUREAD: true
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The state lives on HCP Terraform, which authenticates with a token and not
+      # with the OIDC trust everything else here uses. It is the only long lived
+      # credential in this project, and ADR 0013 records why it is worth its cost.
+      TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 

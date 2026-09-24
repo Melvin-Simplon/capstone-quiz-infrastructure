@@ -1,33 +1,36 @@
 # Builds the environment. The only workflow in this repository that creates
 # anything, and the reason nonprod carries an approval.
 #
-# Called from terraform.yml. It carries no trigger and no condition of its own:
-# what decides whether an apply happens lives there.
-name: Apply
+# A dispatch and nothing else, which is how make infra gets here. Never on a
+# push: the environment is destroyed between sessions, so main usually
+# describes something that deliberately does not exist.
+#
+# The build and security checks run first, the plan left out: the pull request
+# already showed it, and the apply prints what it does as it does it.
+name: CD - Apply
 
 on:
-  workflow_call:
-    secrets:
-      TF_API_TOKEN:
-        required: true
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  ARM_USE_OIDC: true
-  ARM_USE_AZUREAD: true
-  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-  # The state lives on HCP Terraform, which authenticates with a token and not
-  # with the OIDC trust everything else here uses. It is the only long lived
-  # credential in this project, and ADR 0013 records why it is worth its cost.
-  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
-
 jobs:
+  build:
+    # secrets: inherit would hand the called workflow every secret this
+    # repository holds. It declares one, for the plan it skips here.
+    secrets:
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+    uses: ./.github/workflows/ci-build.yml
+    with:
+      lint_only: true
+
+  security:
+    uses: ./.github/workflows/ci-security.yml
+
   apply:
-    name: Terraform
+    name: Apply (Terraform)
+    needs: [build, security]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: nonprod
@@ -39,6 +42,16 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      ARM_USE_OIDC: true
+      ARM_USE_AZUREAD: true
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The state lives on HCP Terraform, which authenticates with a token and not
+      # with the OIDC trust everything else here uses. It is the only long lived
+      # credential in this project, and ADR 0013 records why it is worth its cost.
+      TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 

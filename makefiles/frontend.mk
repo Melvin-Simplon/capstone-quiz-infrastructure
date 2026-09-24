@@ -1,8 +1,7 @@
 # The frontend component.
 
-# The frontend split ci-cd.yml into ci.yml and cd.yml. Deployment lives in
-# the second one, and it is the one that declares workflow_dispatch.
-FRONTEND_WORKFLOW ?= cd.yml
+# Deployment lives in cd-deploy.yml, the frontend's CD - Deploy workflow.
+FRONTEND_WORKFLOW ?= cd-deploy.yml
 
 .PHONY: frontend
 frontend: ## Build and deploy the frontend, verify the site answers

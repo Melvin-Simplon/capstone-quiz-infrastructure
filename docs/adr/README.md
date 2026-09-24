@@ -22,3 +22,4 @@ reasoning that produced them.
 | [0011](0011-linked-backend-not-taken.md) | The better answer to 0003, and why it was not applied | Accepted |
 | [0012](0012-the-environment-must-be-reproducible.md) | Nothing is protected from destruction, so the rebuild can be proven | Accepted |
 | [0013](0013-state-on-terraform-cloud.md) | The state moves to Terraform Cloud, and buys the first long lived secret | Accepted |
+| [0014](0014-the-vault-takes-a-new-name-on-every-build.md) | The vault takes a new name on every build | Accepted |

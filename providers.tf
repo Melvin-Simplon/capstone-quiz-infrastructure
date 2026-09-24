@@ -14,5 +14,15 @@ provider "azurerm" {
       # Resource Manager API anyway, container included.
       data_plane_available = false
     }
+
+    # See ADR 0014. Neither the pipeline nor the environment's owner holds the
+    # subscription scoped right a purge needs, so destroy does not ask for one.
+    # Recovery is off because a recovered vault comes back with its old
+    # secrets, which the state no longer knows and refuses to overwrite.
+    key_vault {
+      purge_soft_delete_on_destroy          = false
+      purge_soft_deleted_secrets_on_destroy = false
+      recover_soft_deleted_key_vaults       = false
+    }
   }
 }

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# tflint, which reads what the configuration asks of the provider.
-#
-# GITHUB_TOKEN is the real fix for the 403s: tflint --init pulls its rulesets
-# through the API, and sixty unauthenticated requests an hour are shared with
-# every other runner. The retry below is for the genuine 500s.
 
 set -euo pipefail
 

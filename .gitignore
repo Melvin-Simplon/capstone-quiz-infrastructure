@@ -16,5 +16,4 @@ tfplan
 .DS_Store
 .idea/
 
-# Operations journal written by the Makefile targets.
 .logs/

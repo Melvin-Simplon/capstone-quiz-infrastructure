@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Puts the plan on the pull request, and on the run summary.
-#
-# A comment is capped by the API, so a long plan is cut short rather than lost.
 
 set -euo pipefail
 

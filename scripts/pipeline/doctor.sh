@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Reports every prerequisite the other targets depend on.
-#
-# The only script here that keeps going after a problem: knowing all of what is
-# missing in one pass is the point. Read only, so nothing is ever reported as
-# changed. Exit status is 0 when nothing failed and nothing was unreachable.
 
 set -euo pipefail
 
@@ -11,8 +6,6 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/pipeline/lib.sh
 source "${HERE}/lib.sh"
 
-# Each entry names the workflow the matching make target dispatches, so this
-# check fails the day one is renamed rather than the next deployment.
 REPOS=(
     "${ORG}/${INFRA_REPO}:cd-apply.yml"
     "${ORG}/${BACKEND_REPO}:cd-deploy.yml"
@@ -49,8 +42,6 @@ check_github() {
     done
 }
 
-# A workflow without workflow_dispatch cannot be triggered at all, which is what
-# every deployment target here does.
 check_dispatch() {
     task "github : workflows can be triggered by hand"
 
@@ -102,9 +93,6 @@ check_azure() {
     fi
 }
 
-# The failure this catches is invisible from GitHub: the credentials exist and
-# look healthy, but they name an owner and a repository that GitHub no longer
-# signs, so azure/login fails on every run with nothing pointing at why.
 check_oidc() {
     task "azure : the OIDC trust matches what github signs"
 
@@ -176,9 +164,6 @@ check_terraform_cloud() {
     elif grep -q '"execution-mode":"local"' <<<"${body}"; then
         report_ok "${TF_WORKSPACE}" "exists, execution mode local"
     else
-        # Remote execution would run Terraform on HashiCorp infrastructure, at an
-        # address the Key Vault firewall step cannot open, and every plan reading
-        # a secret would fail.
         report_failed "${TF_WORKSPACE}" "execution mode is not local"
         hint "remote execution breaks the Key Vault firewall step"
     fi

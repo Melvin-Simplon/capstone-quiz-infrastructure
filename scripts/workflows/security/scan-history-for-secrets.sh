@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Reads commits rather than files: something committed and removed the next day
-# is still readable forever in a public repository. Needs a full clone, which
-# the workflow asks for with fetch-depth: 0.
 
 set -euo pipefail
 
@@ -25,8 +22,6 @@ install_gitleaks() {
 
 scan_history() {
     task "history : scan every commit for secrets"
-    # --redact so a finding names the file and the commit without reprinting
-    # the secret into a public log.
     if ./gitleaks git . --no-banner --redact; then
         report_ok "history" "no secret found"
     else

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Formatting and validity of the Terraform configuration.
-#
-# init -backend=false skips the cloud block, so this needs no HCP Terraform
-# token and no Azure credential.
 
 set -euo pipefail
 

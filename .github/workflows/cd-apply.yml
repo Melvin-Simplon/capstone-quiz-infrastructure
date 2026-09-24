@@ -1,12 +1,3 @@
-# Builds the environment. The only workflow in this repository that creates
-# anything, and the reason nonprod carries an approval.
-#
-# A dispatch and nothing else, which is how make infra gets here. Never on a
-# push: the environment is destroyed between sessions, so main usually
-# describes something that deliberately does not exist.
-#
-# The build and security checks run first, the plan left out: the pull request
-# already showed it, and the apply prints what it does as it does it.
 name: CD - Apply
 
 on:
@@ -17,15 +8,10 @@ permissions:
 
 jobs:
   build:
-    # A called workflow cannot hold more than its caller grants, and GitHub
-    # checks every job in it before starting the run, skipped ones included.
-    # id-token and pull-requests are for the plan, which lint_only skips.
     permissions:
       contents: read
       id-token: write
       pull-requests: write
-    # secrets: inherit would hand the called workflow every secret this
-    # repository holds. It declares one, for the plan it skips here.
     secrets:
       TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
     uses: ./.github/workflows/ci-build.yml
@@ -41,8 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: nonprod
-    # Same group as the plan and the destroy: the state is one blob, and two
-    # runs fight over its lease.
     concurrency:
       group: terraform-state-nonprod
       cancel-in-progress: false
@@ -55,9 +39,6 @@ jobs:
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      # The state lives on HCP Terraform, which authenticates with a token and not
-      # with the OIDC trust everything else here uses. It is the only long lived
-      # credential in this project, and ADR 0013 records why it is worth its cost.
       TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -89,10 +70,6 @@ jobs:
       - name: Apply
         run: terraform apply -input=false -auto-approve -lock-timeout=120s
 
-      # Conditioned on the sign in rather than on always(): when Terraform fails
-      # at init the sign in never ran, and an unconditional close then fails
-      # with "Please run 'az login'", adding a second error to a job that only
-      # had one and burying the real cause.
       - name: Close the Key Vault again
         if: always() && steps.azure.outcome == 'success'
         run: scripts/workflows/deploy/keyvault-firewall.sh remove

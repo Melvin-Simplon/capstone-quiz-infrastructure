@@ -28,7 +28,6 @@ variable "environment" {
   default     = "nonprod"
 }
 
-
 variable "vnet_address_space" {
   description = "Address space of the project virtual network"
   type        = list(string)

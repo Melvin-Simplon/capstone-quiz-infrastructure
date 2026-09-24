@@ -6,10 +6,6 @@ updates:
       interval: weekly
     target-branch: develop
     open-pull-requests-limit: 5
-    # Terraform is absent from the GitHub Advisory Database, so Dependabot only
-    # ever raises version updates here, never security ones. Majors are the only
-    # updates that break the configuration, and skipping them costs no fix:
-    # provider bugs are patched within the 4.x line, which still comes through.
     ignore:
       - dependency-name: hashicorp/azurerm
         update-types: ["version-update:semver-major"]

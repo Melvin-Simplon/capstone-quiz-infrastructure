@@ -1,5 +1,3 @@
-# Everything not tied to one component: the checks, the orchestration, the help.
-
 ##@ Setup
 
 .PHONY: doctor
@@ -12,12 +10,6 @@ bootstrap: ## Repair the OIDC trust, the roles and the repository variables
 
 ##@ Deploy
 
-# Sequential through recursive make rather than a prerequisite list: make is
-# free to reorder prerequisites, and the order is the whole point here. The
-# infrastructure has to exist before anything is deployed onto it, the backend
-# has to answer before the frontend pipeline verifies it, and the frontend has
-# to be rebuilt after any infrastructure rebuild because the API key it bakes
-# in is regenerated whenever the vault is recreated.
 .PHONY: deploy
 deploy: ## Deploy everything in order: infra, backend, frontend
 	@$(MAKE) infra

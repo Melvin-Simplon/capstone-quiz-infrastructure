@@ -1,5 +1,3 @@
-# The infrastructure component, plus the two targets no other component has.
-
 INFRA_WORKFLOW         ?= cd-apply.yml
 INFRA_PLAN_WORKFLOW    ?= ci-build.yml
 INFRA_DESTROY_WORKFLOW ?= cd-destroy.yml

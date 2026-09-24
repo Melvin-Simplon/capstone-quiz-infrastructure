@@ -1,8 +1,3 @@
-# Everything that looks for a weakness before anything is built: secrets
-# committed by mistake, and the configuration read as infrastructure.
-#
-# Runs on every pull request, where it gates the merge. cd-apply.yml calls it
-# before an apply.
 name: CI - Security scan
 
 on:
@@ -15,15 +10,11 @@ permissions:
   contents: read
 
 jobs:
-  # In the diff and in the history.
   secrets:
     name: Secrets (gitleaks and Trivy)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # Full history, because the secret scan below reads commits rather than
-      # files: something committed and removed the next day is still readable
-      # forever in a public repository, which this one is.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -42,18 +33,11 @@ jobs:
           severity: MEDIUM,HIGH,CRITICAL
           exit-code: "1"
 
-  # The configuration read as infrastructure: open ports, public endpoints,
-  # missing encryption, and the rest of what Trivy knows about Terraform. This
-  # repository's equivalent of the SAST category in the two applications: it
-  # reads the configuration, not the code that runs on it.
   config:
     name: IaC (Trivy)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # Trivy reads the configuration from the working tree. Without a checkout
-      # it scans an empty runner, finds nothing, and reports success: the check
-      # stays green while guarding nothing.
       - uses: actions/checkout@v7
 
       - name: Scan the configuration

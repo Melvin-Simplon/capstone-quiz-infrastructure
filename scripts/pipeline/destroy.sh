@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Tears the environment down, through the workflow built for it.
-#
-# The workflow already demands the resource group name as an input. Asking for
-# it here too is not ceremony: it means the name is typed by someone reading
-# this warning rather than pasted from a shell history.
 
 set -euo pipefail
 
@@ -32,7 +27,6 @@ EOF
 
 read -r -p "Type the resource group name to confirm: " answer
 if [[ "${answer}" != "${RESOURCE_GROUP}" ]]; then
-    # Not exit 0: a caller has to be able to tell a refusal from a completed run.
     die "got '${answer}', expected '${RESOURCE_GROUP}'. Nothing was touched."
 fi
 

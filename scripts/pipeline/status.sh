@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Where each repository stands, and what is actually reachable on Azure.
 
 set -euo pipefail
 
@@ -15,9 +14,6 @@ require_cmd gh "See https://cli.github.com"
 
 REPOS=("${ORG}/${INFRA_REPO}" "${ORG}/${BACKEND_REPO}" "${ORG}/${FRONTEND_REPO}")
 
-# Follows whatever is running right now, across the three repositories. The
-# first one found wins: they are dispatched in sequence, so at most one is in
-# flight when `make deploy` is driving them.
 follow_running() {
     task "follow the run in progress"
     local repo id
@@ -55,8 +51,6 @@ show_runs() {
     done
 }
 
-# Resolved by tag rather than by name, the same way the pipelines find them, so
-# a rebuilt environment is reported without editing anything here.
 show_urls() {
     task "azure : what answers today"
 

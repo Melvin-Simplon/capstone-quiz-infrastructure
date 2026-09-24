@@ -1,9 +1,5 @@
 name: CD - Destroy
 
-# Deliberately its own file, apart from cd-apply.yml, so that no push, no pull
-# request and no future edit to a trigger there can ever reach a destroy: the
-# only way in is someone opening this workflow and typing the resource group
-# name by hand.
 on:
   workflow_dispatch:
     inputs:
@@ -21,11 +17,6 @@ env:
   ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-  # The state lives on HCP Terraform, which authenticates with a token and not
-  # with the OIDC trust everything else here uses. It is the only long lived
-  # credential in this project, and ADR 0013 records why it is worth its cost.
-  # The lint job does not need it: `terraform init -backend=false` skips the
-  # cloud block entirely, which was verified rather than assumed.
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
 
 jobs:
@@ -33,8 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: nonprod
-    # Same group as plan and apply: the state is one blob, and a destroy racing
-    # a plan would fight over the same lease.
     concurrency:
       group: terraform-state-nonprod
       cancel-in-progress: false
@@ -72,23 +61,12 @@ jobs:
       - name: Open the Key Vault to this runner
         run: scripts/workflows/deploy/keyvault-firewall.sh add
 
-      # Printed before anything is removed, so the job log carries a record of
-      # what the run was about to take away.
       - name: Plan the destruction
         run: terraform plan -destroy -input=false -no-color -lock-timeout=120s
 
-      # Runs to completion. ADR 0012 removed the seven prevent_destroy blocks,
-      # so nothing stops this: the database, the storage account and the vault
-      # go with the rest. What is left against an accident is the plan printed
-      # above, the resource group name typed into the dispatch form, and the
-      # approval on the nonprod environment.
       - name: Destroy
         run: terraform destroy -input=false -auto-approve -lock-timeout=120s
 
-      # Conditioned on the sign in rather than on always(): when Terraform fails
-      # at init the sign in never ran, and an unconditional close then fails
-      # with "Please run 'az login'", adding a second error to a job that only
-      # had one and burying the real cause.
       - name: Close the Key Vault again
         if: always() && steps.azure.outcome == 'success'
         run: scripts/workflows/deploy/keyvault-firewall.sh remove

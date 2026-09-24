@@ -3,8 +3,6 @@ resource "random_password" "backend_api_key" {
   special = false
 }
 
-# Drawn again on every rebuild, since destroy removes it with the rest. See
-# ADR 0014 for why the vault cannot keep one name across rebuilds.
 resource "random_string" "key_vault" {
   length  = 4
   upper   = false
@@ -18,31 +16,17 @@ resource "azurerm_key_vault" "main" {
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
 
-  # Role assignments rather than access policies: the same RBAC model as every
-  # other resource here, and it can be scoped to a single secret if ever needed.
   rbac_authorization_enabled = true
 
   soft_delete_retention_days = 7
-  # Left off deliberately: the training subscription cannot purge a protected
-  # vault, so a rebuild would collide with the soft-deleted name for 90 days.
-  purge_protection_enabled = false
+  purge_protection_enabled   = false
 
-  # Kept reachable, unlike the storage account, because secrets are written over
-  # the data plane and the firewall below is what actually restricts it.
   public_network_access_enabled = true
 
   network_acls {
     default_action = "Deny"
-    # Lets Azure services that authenticate with a managed identity through, which
-    # is how App Service resolves the @Microsoft.KeyVault references.
-    bypass = "AzureServices"
-    # Empty, and left alone afterwards: whoever runs Terraform has to read these
-    # secrets over the data plane, and gets a different address on every run. An
-    # address that changes each time is not desired state, so scripts/keyvault-
-    # firewall.sh opens the door for the run and closes it after. Holding the
-    # list here instead deadlocks the refresh: Terraform would have to read the
-    # secrets before it could grant itself the right to read them.
-    ip_rules = []
+    bypass         = "AzureServices"
+    ip_rules       = []
   }
 
   tags = merge(local.common_tags, { component = "secrets" })
@@ -57,14 +41,6 @@ resource "azurerm_key_vault" "main" {
   }
 }
 
-# The pipeline's identity: Contributor on the resource group is a control plane
-# role and grants nothing on secrets, so writing them requires this.
-#
-# Named explicitly rather than read from the current credentials: keyed on
-# whoever happens to be running, this assignment changes hands on every run, and
-# a plan run by a person would propose to take it away from the pipeline. A
-# person who needs to read a plan locally is granted the role separately, which
-# is not something this configuration should be describing.
 resource "azurerm_role_assignment" "deployer_secrets" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets Officer"
@@ -93,8 +69,6 @@ resource "azurerm_key_vault_secret" "redis_primary_key" {
   depends_on = [azurerm_role_assignment.deployer_secrets]
 }
 
-# Generated here rather than handed over by anyone: the frontend reads it back
-# from the vault at deploy time and inlines it in its build.
 resource "azurerm_key_vault_secret" "backend_api_key" {
   name         = "backend-api-key"
   value        = random_password.backend_api_key.result

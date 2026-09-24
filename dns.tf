@@ -1,7 +1,3 @@
-# One private DNS zone per service reached privately. Without them the public
-# names of PostgreSQL, Redis, Storage and Key Vault keep resolving to their public
-# addresses from inside the network, and the private endpoints are never used.
-# Zone names are imposed by Azure, they are not a naming choice.
 resource "azurerm_private_dns_zone" "postgres" {
   name                = "${local.name_suffix}.postgres.database.azure.com"
   resource_group_name = data.azurerm_resource_group.main.name

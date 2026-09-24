@@ -1,6 +1,3 @@
-# The frontend component.
-
-# Deployment lives in cd-deploy.yml, the frontend's CD - Deploy workflow.
 FRONTEND_WORKFLOW ?= cd-deploy.yml
 
 .PHONY: frontend

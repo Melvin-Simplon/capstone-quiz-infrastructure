@@ -7,9 +7,6 @@ resource "azurerm_virtual_network" "main" {
   tags = merge(local.common_tags, { component = "network" })
 }
 
-# Outbound path of the backend. The App Service Plan is shared with the whole
-# promotion, so this subnet carries integration traffic only and never hosts a
-# resource of its own.
 resource "azurerm_subnet" "app" {
   name                 = "snet-app-${local.name_suffix}"
   resource_group_name  = data.azurerm_resource_group.main.name
@@ -26,19 +23,12 @@ resource "azurerm_subnet" "app" {
   }
 }
 
-# PostgreSQL Flexible Server is injected into its own subnet rather than reached
-# through a private endpoint. Private access is the mode the server supports
-# natively, it removes the public endpoint entirely instead of leaving it up and
-# filtered, and a delegated subnet accepts exactly one delegation, hence a
-# dedicated one here.
 resource "azurerm_subnet" "postgres" {
   name                 = "snet-postgres-${local.name_suffix}"
   resource_group_name  = data.azurerm_resource_group.main.name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [var.subnet_postgres_prefix]
 
-  # Added by Azure itself when the server is injected here, so declaring it is
-  # what stops Terraform from trying to take it away on every run.
   service_endpoints = ["Microsoft.Storage"]
 
   delegation {
@@ -51,10 +41,6 @@ resource "azurerm_subnet" "postgres" {
   }
 }
 
-# Redis, Storage and Key Vault are reached through private endpoints landing here.
-# Network policies stay enabled on purpose: when they are disabled, the NSG below
-# is simply not evaluated for private endpoint traffic and the segmentation would
-# only look enforced.
 resource "azurerm_subnet" "privatelink" {
   name                              = "snet-privatelink-${local.name_suffix}"
   resource_group_name               = data.azurerm_resource_group.main.name
@@ -68,8 +54,6 @@ resource "azurerm_network_security_group" "app" {
   resource_group_name = data.azurerm_resource_group.main.name
   location            = data.azurerm_resource_group.main.location
 
-  # Integration traffic is outbound only, so nothing inside the network has a
-  # reason to reach this subnet.
   security_rule {
     name                       = "DenyVnetInbound"
     priority                   = 4096
@@ -122,8 +106,6 @@ resource "azurerm_network_security_group" "privatelink" {
   resource_group_name = data.azurerm_resource_group.main.name
   location            = data.azurerm_resource_group.main.location
 
-  # 443 for Storage and Key Vault, 10000 for Managed Redis. The frontend is a
-  # Static Web App outside the network and must never appear as a source here.
   security_rule {
     name                       = "AllowBackendToPrivateEndpoints"
     priority                   = 100

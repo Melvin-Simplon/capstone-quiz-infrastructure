@@ -1,22 +1,4 @@
 #!/usr/bin/env bash
-# Shared by the workflow scripts. Sourced, never executed.
-#
-# The reporting contract is Ansible's, because it already answers what an
-# operator asks of a pipeline step: what ran, what changed, what could not be
-# reached, and can it be run again safely.
-#
-#   ok           already in the wanted state, nothing was done
-#   changed      it was not, and this run changed it
-#   skipping     did not apply, or could not be evaluated here
-#   unreachable  the thing itself could not be contacted
-#   fatal        contacted, evaluated, and it is wrong
-#
-# unreachable is the one that pays for itself here: a runner that cannot reach
-# Azure is not a broken deployment, and reporting it as one sends people
-# reading the wrong code.
-#
-# Everything goes to stderr. A function whose output is captured owes stdout to
-# its return value alone, and these scripts capture each other constantly.
 
 if [[ -t 2 || -n "${GITHUB_ACTIONS:-}" ]] && [[ -z "${NO_COLOR:-}" ]]; then
     C_RESET=$'\033[0m'
@@ -59,8 +41,6 @@ report_unreachable() { RECAP_UNREACHABLE=$(( RECAP_UNREACHABLE + 1 )); _report "
 
 hint() { printf '             %s\n' "$*" >&2; }
 
-# Returns non-zero when anything failed or was unreachable, so a caller can use
-# it as its exit status. Skipped never fails a run: not applicable is not wrong.
 recap() {
     local name="${1:-play}"
     printf '\n%sPLAY RECAP %s%s\n' "$C_HEAD" "$(_stars 62)" "$C_RESET" >&2
@@ -74,9 +54,6 @@ recap() {
     [[ "$RECAP_FAILED" -eq 0 && "$RECAP_UNREACHABLE" -eq 0 ]]
 }
 
-# One shape for every job's summary page: the category, the tool, an Ansible
-# status word, and the numbers that answer the question the job was asked.
-# Silent outside Actions, so the scripts still run by hand.
 summary() {
     local category="$1" tool="$2" status="$3" figures="$4"
     [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
@@ -87,7 +64,6 @@ summary() {
     } >> "$GITHUB_STEP_SUMMARY"
 }
 
-# Reports and stops. For the case where continuing makes no sense.
 die() {
     local host="$1"; shift
     report_failed "$host" "$@"

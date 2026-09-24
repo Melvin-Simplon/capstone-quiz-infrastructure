@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Creates the Key Vault on its own before the rest, on a cold start only.
-#
-# Terraform would otherwise create it with its firewall closed and fail on the
-# first secret it writes, having already built everything else. A no-op once
-# the vault exists.
 
 set -euo pipefail
 

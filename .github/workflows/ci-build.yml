@@ -1,13 +1,3 @@
-# Everything that says whether the configuration holds together and what it
-# would change: formatting, validity, provider usage, then the plan.
-#
-# Runs on every pull request, where it gates the merge and posts the plan.
-# make plan dispatches it on its own. cd-apply.yml calls it with lint_only
-# before an apply.
-#
-# The lint jobs run `terraform init -backend=false`, which skips the cloud
-# block entirely, so neither needs the HCP Terraform token nor an Azure
-# credential. Only the plan does.
 name: CI - Build module
 
 on:
@@ -61,26 +51,9 @@ jobs:
   plan:
     name: Plan (Terraform)
     needs: [terraform, tflint]
-    # Skipped for Dependabot: those runs get a separate, empty secret store, so
-    # TF_API_TOKEN arrives blank and init stops on "Required token could not be
-    # found". A job skipped by its own condition still reports its check, so a
-    # ruleset requiring it does not wait. cd-apply.yml skips it too: it applies
-    # right after, and the pull request already showed the plan.
     if: ${{ !inputs.lint_only && github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # The state lives in a single blob, so a run on one branch races a run on
-    # another for its lease. Keying this on the ref, as it once was, put every
-    # branch in its own queue and let a pull request plan die on
-    # LeaseAlreadyPresent while an apply held the lock on main. The lock timeout
-    # does not save it: when the lease is taken mid-write the blob carries no
-    # terraformlockid and Terraform gives up instead of waiting.
-    #
-    # One consequence worth knowing: a run waiting on the nonprod approval holds
-    # this group while it waits, and timeout-minutes does not help, because a job
-    # that has not started has no clock running. A plan queued behind an
-    # unapproved apply or destroy stays queued until that one is approved or
-    # cancelled.
     concurrency:
       group: terraform-state-nonprod
       cancel-in-progress: false
@@ -94,9 +67,6 @@ jobs:
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      # The state lives on HCP Terraform, which authenticates with a token and not
-      # with the OIDC trust everything else here uses. It is the only long lived
-      # credential in this project, and ADR 0013 records why it is worth its cost.
       TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -108,8 +78,6 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
-      # No client secret: the workflow proves which repository and branch it
-      # runs from, and Azure hands back a token that dies with the job.
       - name: Sign in to Azure
         id: azure
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -118,9 +86,6 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # Reading the vault's secrets goes through the data plane, which its
-      # firewall filters. The door is opened for this run and closed right
-      # after, rather than left described in the configuration.
       - name: Open the Key Vault to this runner
         run: scripts/workflows/deploy/keyvault-firewall.sh add
 
@@ -128,10 +93,6 @@ jobs:
         shell: bash
         run: terraform plan -input=false -no-color -lock-timeout=120s | tee plan.txt
 
-      # Conditioned on the sign in rather than on always(): when Terraform fails
-      # at init the sign in never ran, and an unconditional close then fails
-      # with "Please run 'az login'", adding a second error to a job that only
-      # had one and burying the real cause.
       - name: Close the Key Vault again
         if: always() && steps.azure.outcome == 'success'
         run: scripts/workflows/deploy/keyvault-firewall.sh remove

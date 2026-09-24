@@ -1,5 +1,3 @@
-# The backend component.
-
 BACKEND_WORKFLOW ?= cd-deploy.yml
 
 ##@ Deploy

@@ -17,6 +17,13 @@ permissions:
 
 jobs:
   build:
+    # A called workflow cannot hold more than its caller grants, and GitHub
+    # checks every job in it before starting the run, skipped ones included.
+    # id-token and pull-requests are for the plan, which lint_only skips.
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     # secrets: inherit would hand the called workflow every secret this
     # repository holds. It declares one, for the plan it skips here.
     secrets:

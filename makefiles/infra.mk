@@ -1,19 +1,20 @@
 # The infrastructure component, plus the two targets no other component has.
 
-INFRA_WORKFLOW         ?= terraform.yml
-INFRA_DESTROY_WORKFLOW ?= terraform-destroy.yml
+INFRA_WORKFLOW         ?= cd-apply.yml
+INFRA_PLAN_WORKFLOW    ?= ci-build.yml
+INFRA_DESTROY_WORKFLOW ?= cd-destroy.yml
 
 ##@ Deploy
 
 .PHONY: infra
 infra: ## Apply the Terraform configuration
-	@$(call dispatch,$(INFRA_REPO),$(INFRA_WORKFLOW),infra,action=apply)
+	@$(call dispatch,$(INFRA_REPO),$(INFRA_WORKFLOW),infra)
 
 ##@ Inspect
 
 .PHONY: plan
 plan: ## Run a Terraform plan and print it
-	@$(call dispatch,$(INFRA_REPO),$(INFRA_WORKFLOW),plan,action=plan) --print-log
+	@$(call dispatch,$(INFRA_REPO),$(INFRA_PLAN_WORKFLOW),plan) --print-log
 
 ##@ Teardown
 

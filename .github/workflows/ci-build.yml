@@ -61,12 +61,8 @@ jobs:
   plan:
     name: Plan (Terraform)
     needs: [terraform, tflint]
-    # Skipped for Dependabot: those runs get a separate, empty secret store, so
-    # TF_API_TOKEN arrives blank and init stops on "Required token could not be
-    # found". A job skipped by its own condition still reports its check, so a
-    # ruleset requiring it does not wait. cd-apply.yml skips it too: it applies
-    # right after, and the pull request already showed the plan.
-    if: ${{ !inputs.lint_only && github.actor != 'dependabot[bot]' }}
+    # cd-apply.yml skips it because it applies right after, and the pull request already showed the plan.
+    if: ${{ !inputs.lint_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The state lives in a single blob, so a run on one branch races a run on

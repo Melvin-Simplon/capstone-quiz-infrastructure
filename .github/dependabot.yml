@@ -1,0 +1,35 @@
+version: 2
+# Monthly and grouped, so the repository gets two pull requests a month at most.
+updates:
+  - package-ecosystem: terraform
+    directory: /
+    schedule:
+      interval: monthly
+      time: '06:00'
+      timezone: Europe/Paris
+    target-branch: develop
+    open-pull-requests-limit: 1
+    groups:
+      terraform:
+        patterns:
+          - '*'
+    # Terraform is absent from the GitHub Advisory Database, so Dependabot only
+    # ever raises version updates here, never security ones. Majors are the only
+    # updates that break the configuration, and skipping them costs no fix:
+    # provider bugs are patched within the 4.x line, which still comes through.
+    ignore:
+      - dependency-name: hashicorp/azurerm
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: '06:00'
+      timezone: Europe/Paris
+    target-branch: develop
+    open-pull-requests-limit: 1
+    groups:
+      github-actions:
+        patterns:
+          - '*'

@@ -75,6 +75,11 @@ configuration as infrastructure, not the code that runs on it.
 The two lint jobs are handed no secret at all. Both run `terraform init -backend=false`, which
 skips the cloud block, so neither needs the HCP Terraform token nor an Azure credential.
 
+The plan is skipped on Dependabot runs. GitHub hands those a separate, empty secret store, so
+`TF_API_TOKEN` arrives blank and `terraform init` stops on "Required token could not be found",
+failing a required check on a branch that only bumps a provider. `Lint (Terraform fmt and validate)`
+still installs the bumped provider and validates against it, so the bump is not merged unverified.
+
 Applying is never a side effect of a merge, and a push to `main` runs nothing at all: every check
 already passed on the pull request. An apply on every push would assume `main` should always be
 applied and that an environment not matching it is drift to correct, and that is not this project:
